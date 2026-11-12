@@ -48,3 +48,8 @@ violations) with ~Y s average response latency, at near-zero cost.
   sharing (1 frame/s), newest frame attached as JPEG before each LLM call, vision model
   qwen/qwen3.8-27b on Groq, spoken AI + privacy disclaimer. 20 unit tests pass. Live: model read
   "ModuleNotFoundError: No module named 'pandas'" from a fake 1440x900 screenshot (2.5 s test).
+- 2026-11-12: S1 real test with the /buddy page (HTTP screenshots): no freeze, no disconnect. 38 screenshots
+  uploaded (1280x598, ~49 KB each), attached on every turn. It read a web dashboard correctly (totals, monthly
+  amount) and converted an amount to rupees on request (rate from model knowledge, not live). TTFB avg:
+  STT 0.64 s, LLM (qwen3.8-27b + image) 0.79 s (max 2.61), Kokoro 3.83 s (max 13.5). RSS 525 MB.
+  Still to test: an error message on screen (S1 "done when").
