@@ -44,3 +44,7 @@ violations) with ~Y s average response latency, at near-zero cost.
   formats ("850", "8.15") misread. See notes/failures.md. Live text checks 6/6 (accept 8:15, 8:50,
   8 pm; refuse 10 pm; gives name). Session 2 TTFB avg: STT 0.61 s, LLM 0.40 s, Kokoro TTS 1.95 s
   (max 5.66 s). Bot process RSS after 2 calls: 656 MB.
+- 2026-11-12: Direction change to a screen-aware work buddy, renamed "Call Buddy". S1 built: screen
+  sharing (1 frame/s), newest frame attached as JPEG before each LLM call, vision model
+  qwen/qwen3.8-27b on Groq, spoken AI + privacy disclaimer. 20 unit tests pass. Live: model read
+  "ModuleNotFoundError: No module named 'pandas'" from a fake 1440x900 screenshot (2.5 s test).

@@ -1,1 +1,1 @@
-"""CallBuddy: an AI agent that makes phone calls for you."""
+"""Call Buddy: an AI work buddy that sees your screen (and can make phone calls for you)."""

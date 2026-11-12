@@ -1,14 +1,15 @@
-"""CallBuddy voice bot (Phase 1): talk to it in your browser.
+"""Call Buddy voice bot: talk to it in your browser, and share your screen so it can see.
 
-Run:   uv run python bot.py                      (free chat)
+Run:   uv run python bot.py                      (screen buddy, the default)
        uv run python bot.py --task "Book a table for 4 at 8 pm Saturday, 7:30-9 ok"
                                                   (call mode: you play the restaurant)
-Open:  http://localhost:7860/client  and click Connect (use headphones!)
+Open:  http://localhost:7860/client  click Connect (use headphones!), then share your screen.
 
 How a voice turn flows through the pipeline (each box is a Pipecat "processor";
 "frames" of audio/text flow from left to right):
 
-  mic audio -> [transport.input] -> [STT: Deepgram] -> [user aggregator + Silero VAD]
+  mic + screen -> [transport.input] -> [ScreenBuffer: keeps newest screen frame]
+            -> [STT] -> [user aggregator + Silero VAD] -> [ScreenInjector: adds screenshot]
             -> [LLM: Groq] -> [TTS: Kokoro] -> [transport.output] -> your speakers
             -> [assistant aggregator] (remembers what the bot actually said)
 """
@@ -33,7 +34,7 @@ setup_logging(
 logger.info("Loading Pipecat (first run downloads the Silero and Kokoro models)...")
 
 from pipecat.audio.vad.silero import SileroVADAnalyzer  # noqa: E402
-from pipecat.frames.frames import LLMRunFrame, TTSSpeakFrame  # noqa: E402
+from pipecat.frames.frames import TTSSpeakFrame  # noqa: E402
 from pipecat.pipeline.pipeline import Pipeline  # noqa: E402
 from pipecat.pipeline.runner import PipelineRunner  # noqa: E402
 from pipecat.pipeline.task import PipelineParams, PipelineTask  # noqa: E402
@@ -46,17 +47,18 @@ from pipecat.runner.types import RunnerArguments  # noqa: E402
 from pipecat.runner.utils import create_transport  # noqa: E402
 from pipecat.services.groq.llm import GroqLLMService  # noqa: E402
 from pipecat.services.kokoro.tts import KokoroTTSService  # noqa: E402
-from pipecat.transports.base_transport import BaseTransport, TransportParams  # noqa: E402
+from pipecat.transports.base_transport import (  # noqa: E402
+    BaseTransport,
+    TransportParams,
+    VideoInSourceParams,
+)
 
 from callbuddy.brief import CallBrief  # noqa: E402
 from callbuddy.planner import plan_call  # noqa: E402
-from callbuddy.prompts import (  # noqa: E402
-    GREETING_INSTRUCTION,
-    SYSTEM_PROMPT,
-    build_call_prompt,
-)
+from callbuddy.prompts import GREETING, SYSTEM_PROMPT, build_call_prompt  # noqa: E402
+from callbuddy.screen import SCREEN_SOURCE, ScreenBuffer, ScreenInjector  # noqa: E402
 
-# Set once at startup when --task is given. None means free-chat mode (Phase 1).
+# Set once at startup when --task is given. None means screen-buddy mode (the default).
 CALL_BRIEF: CallBrief | None = None
 
 
@@ -75,15 +77,21 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     # 2. LLM (the brain): Groq's OpenAI-compatible API. Streams the reply token by token,
     #    so TTS can start speaking before the whole answer is finished.
-    llm = GroqLLMService(
-        api_key=settings.groq_api_key.get_secret_value(),
-        settings=GroqLLMService.Settings(
+    #    Call mode: gpt-oss (text) with rules from the CallBrief.
+    #    Screen mode: a model that can read images, since it gets screenshots.
+    if CALL_BRIEF:
+        llm_settings = GroqLLMService.Settings(
             model=settings.groq_model,
-            # Call mode: rules come from the CallBrief. Free chat: the short Phase 1 prompt.
-            system_instruction=build_call_prompt(CALL_BRIEF) if CALL_BRIEF else SYSTEM_PROMPT,
+            system_instruction=build_call_prompt(CALL_BRIEF),
             reasoning_effort=settings.groq_reasoning_effort,
-        ),
-    )
+        )
+    else:
+        llm_settings = GroqLLMService.Settings(
+            model=settings.vision_model,
+            system_instruction=SYSTEM_PROMPT,
+            reasoning_effort=settings.vision_reasoning_effort,
+        )
+    llm = GroqLLMService(api_key=settings.groq_api_key.get_secret_value(), settings=llm_settings)
 
     # 3. TTS (text-to-speech): Kokoro runs locally on your CPU, free, no API key.
     tts = KokoroTTSService(settings=KokoroTTSService.Settings(voice=settings.kokoro_voice))
@@ -98,11 +106,16 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
     )
 
+    # 5. Screen: remember the newest shared-screen frame, attach it before each LLM call.
+    screen_buffer = ScreenBuffer()
+
     pipeline = Pipeline(
         [
-            transport.input(),  # audio from the browser mic
+            transport.input(),  # audio from the browser mic (+ screen frames)
+            screen_buffer,  # keeps the newest screen frame, drops video from the pipeline
             stt,  # audio -> text
             user_aggregator,  # text -> "user said X" in the context
+            ScreenInjector(screen_buffer),  # adds "this is my screen right now" + screenshot
             llm,  # context -> reply text (streamed)
             tts,  # reply text -> audio
             transport.output(),  # audio -> browser speakers
@@ -125,9 +138,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             # repeated the opening line every time it was interrupted (notes/failures.md #1).
             await task.queue_frames([TTSSpeakFrame(CALL_BRIEF.opening_line)])
         else:
-            # Free chat: ask the LLM to greet first, so you know it's working.
-            context.add_message({"role": "developer", "content": GREETING_INSTRUCTION})
-            await task.queue_frames([LLMRunFrame()])
+            # Screen mode: fixed greeting with the privacy disclaimer, spoken word for word.
+            await task.queue_frames([TTSSpeakFrame(GREETING)])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
@@ -142,7 +154,14 @@ async def bot(runner_args: RunnerArguments):
     """Entry point the Pipecat runner calls when a browser connects."""
     transport_params = {
         # SmallWebRTC: a direct browser <-> laptop WebRTC connection, no account needed.
-        "webrtc": lambda: TransportParams(audio_in_enabled=True, audio_out_enabled=True),
+        # In screen mode we also take the shared screen, 1 frame per second (plenty for
+        # reading a screen, and cheap). Call mode is audio only.
+        "webrtc": lambda: TransportParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            video_in_enabled=CALL_BRIEF is None,
+            video_in_sources={SCREEN_SOURCE: VideoInSourceParams(framerate=1)} if CALL_BRIEF is None else {},
+        ),
     }
     transport = await create_transport(runner_args, transport_params)
     await run_bot(transport, runner_args)
@@ -155,7 +174,7 @@ if __name__ == "__main__":
 
     # Our own flag. The same parser is handed to Pipecat's runner, which adds its flags
     # (--host, --port, ...) to it, so `--task` and the runner flags work together.
-    parser = argparse.ArgumentParser(description="CallBuddy voice bot")
+    parser = argparse.ArgumentParser(description="Call Buddy voice bot")
     parser.add_argument("--task", help="Task for the call, e.g. 'Book a table for 4 at 8 pm Sat'")
     known, _ = parser.parse_known_args()
 
@@ -169,6 +188,6 @@ if __name__ == "__main__":
         )
         logger.info("Call brief:\n" + CALL_BRIEF.model_dump_json(indent=2))
     else:
-        logger.info("No --task given: free-chat mode")
+        logger.info(f"No --task given: screen-buddy mode (vision model {settings.vision_model})")
 
     main(parser)

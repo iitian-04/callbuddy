@@ -1,17 +1,20 @@
-# CallBuddy
+# Call Buddy
 
-An AI agent that makes phone calls for you: you type a task, a planner LLM writes a call brief,
-a Pipecat voice pipeline runs the call, and you get a summary back.
+A voice AI work buddy that can see your screen. Share your screen in the browser, talk, and it
+explains what's on it: errors, emails, pages, "what should I click?". It only looks and explains
+for now; safe actions (with your OK) and phone calls for you come later.
 
-> Work in progress (Phase 1: voice bot in the browser). See [ROADMAP.md](ROADMAP.md) and [RESULTS.md](RESULTS.md).
+It can also run a planned phone-call conversation: `uv run python bot.py --task "..."`.
+
+> Work in progress (S1: see and explain). See [ROADMAP.md](ROADMAP.md) and [RESULTS.md](RESULTS.md).
 
 ## Quickstart (macOS / Linux)
 
 ```bash
 git clone <this repo> && cd callbuddy
 uv sync                      # installs Python 3.12 deps from uv.lock
-cp .env.example .env         # then add your own DEEPGRAM_API_KEY and GROQ_API_KEY
-uv run python bot.py         # open http://localhost:7860/client, click Connect, use headphones
+cp .env.example .env         # then add your own GROQ_API_KEY (Deepgram key optional)
+uv run python bot.py         # open http://localhost:7860/client, click Connect, share your screen
 uv run pytest                # unit tests (no API calls)
 ```
 
@@ -23,5 +26,9 @@ uv run pytest                # unit tests (no API calls)
   `~/.cache/pipecat/kokoro-onnx/` and run again (a half-downloaded file is not re-downloaded on its own).
 - **Bot talks to itself**: use headphones.
 
-## Safety
-Keys live only in `.env` (gitignored). The bot says it is an AI. It only calls numbers you give it for that run.
+## Privacy and safety
+- While you share your screen, a screenshot (max 1280 px) is sent to Groq each time you speak, so it
+  can answer about it. Nothing is saved to disk. Keep passwords, banking and private chats off screen.
+  Call Buddy says this out loud every time you connect.
+- Keys live only in `.env` (gitignored). Call Buddy always says it is an AI.
+- Call mode only calls numbers you give it for that run.

@@ -1,8 +1,8 @@
-# CallBuddy
+# Call Buddy
 
-An AI agent that makes phone calls for the user. The user types a task, a planner LLM
-writes a "call brief", a Pipecat voice pipeline runs the call, and a post-call summary
-comes back. Full plan: see ROADMAP.md. Progress and numbers: see RESULTS.md.
+A voice AI work buddy that sees the user's shared screen and explains what's on it
+(read-only for now). End goal: understands the user's work and does tasks with their OK.
+Phone-call mode (planner LLM writes a "call brief", Pipecat runs the call) is kept for S5. Full plan: see ROADMAP.md. Progress and numbers: see RESULTS.md.
 
 ## About me (adjust how you work to this)
 - 2nd-year student, learning agentic AI. Explain new concepts in short code comments,
@@ -12,7 +12,7 @@ comes back. Full plan: see ROADMAP.md. Progress and numbers: see RESULTS.md.
 
 ## Stack: keep it FREE
 - Python 3.11+, uv for packages, Pipecat for the voice pipeline
-- STT: Deepgram (free credit) | LLM: Groq (free tier, OpenAI-compatible) | TTS: Kokoro (local)
+- STT: Groq Whisper (Deepgram optional) | LLM: Groq gpt-oss-120b (calls), qwen3.8-27b (screen/vision) | TTS: Kokoro (local)
 - Transport: SmallWebRTC (browser) first; Twilio trial only in Phase 4
 - Never pick a paid service, paid tier, or upgrade. If something seems to need money,
   stop and ask me first.
@@ -37,7 +37,7 @@ comes back. Full plan: see ROADMAP.md. Progress and numbers: see RESULTS.md.
 - Ask before running any command that installs system software, deletes files, or spends credit.
 
 ## Commands
-- Run bot (browser): uv run python bot.py
+- Run bot (browser, screen buddy): uv run python bot.py
 - Run with a task:   uv run python bot.py --task "..."
 - Tests:             uv run pytest
 - Eval:              uv run python eval/run_eval.py

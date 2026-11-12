@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     groq_model: str = "openai/gpt-oss-120b"
     # gpt-oss "thinks" before answering; "low" keeps that short so voice replies are fast.
     groq_reasoning_effort: str = "low"
+    # S1 screen mode: a Groq model that can read images (gpt-oss is text-only).
+    vision_model: str = "qwen/qwen3.8-27b"
+    vision_reasoning_effort: str = "none"  # no "thinking" = fastest replies for voice
     kokoro_voice: str = "af_heart"
     log_level: str = "INFO"
     # Phase 2: the name the agent says it is calling for, if the task doesn't give one.
