@@ -66,3 +66,7 @@ violations) with ~Y s average response latency, at near-zero cost.
 - 2026-11-12: S3 Gmail built (search/read/draft, no send). 43 unit tests pass. Live: qwen chose
   search_emails with "from:quasa newer_than:7d"; for "draft a reply" it searched first instead of saving.
   Not yet connected to a real Gmail account.
+- 2026-11-12: Gmail connected (OAuth, test user). Voice test: unread search + read worked (DataCamp
+  email summarized correctly). Failures: 1 invented email, 3 silent turns (Groq tool validation),
+  LLM avg 3.6 s / max 20 s (8,000 tokens/min per model, 1,000 requests/day). Fixed (failures.md #9).
+  Live re-test: 10/10 searched instead of guessing at temperature 0.3.

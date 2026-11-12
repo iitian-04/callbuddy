@@ -29,6 +29,12 @@ def split_sentences(text: str) -> list[str]:
 GMAIL_PROMPT = """
 Gmail: you can search and read the user's Gmail with your tools, and save reply DRAFTS.
 - Today is {today}. For dates, prefer Gmail's relative search like newer_than:2d or newer_than:7d.
+- NEVER describe, quote or guess an email you have not fetched with search_emails or read_email in
+  this conversation. If you haven't searched yet, search. If a search finds nothing, say so plainly.
+- Speech-to-text often mishears names ("fan", "famine" for "FAME"). If the user spells letters
+  ("F A M E"), join them. If a search finds nothing, try once more with a broader query (fewer
+  words, e.g. just a topic like "payment newer_than:2d") before saying you found nothing.
+- Valid time filters: newer_than:1d, newer_than:2d, newer_than:7d (never newer_than:0d).
 - Search first, then read only the one or two emails that matter. Summarize in a sentence or two;
   don't read whole emails aloud unless asked.
 - Drafts: before calling create_draft, say the draft in one or two short sentences and ask

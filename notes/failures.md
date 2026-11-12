@@ -62,6 +62,18 @@ Real failures seen while testing, with the fix. Newest last.
 - Fix: no screenshot for replies of 3 words or fewer; screenshots 1024 px instead of 1280;
   while the bot speaks you need 3+ words to interrupt (MinWordsUserTurnStartStrategy).
 
+## 9. Gmail: invented an email, went silent, slow (S3, 2026-11-12)
+- Seen: "That email was from FAME at Samsung, about a payment on August 26" with NO search behind
+  it (only 3 tool calls all session); 3x the bot went silent; LLM replies avg 3.6 s, max 20 s.
+- Causes: (1) the model answered from imagination; (2) it sometimes sent a tool call with an
+  empty argument and Groq rejected the whole reply ("missing properties: 'query'"); (3) every model
+  on Groq free tier = 8,000 tokens/min, and prompt + notes + 16 messages + tool results were big;
+  (4) speech-to-text misheard the name ("fan", "famine" for FAME).
+- Fixes: prompt rule "never describe an email you haven't fetched", broader retry search, spelled
+  letters joined; no "required" fields in tool schemas (checked in code, model gets a hint);
+  temperature 0.3 (live: 10/10 searched, was 4/5 with one junk reply); snippets 120 chars,
+  context 10 messages, previous-session summary capped at 400 chars.
+
 ## Open: Kokoro "TTS context completed with no audio" errors (0 in the last session)
 - Seen in every session (4-5 times per call; also right after the TTSSpeakFrame opening line). Non-fatal: speech continues. Cause not yet
   found; to investigate.

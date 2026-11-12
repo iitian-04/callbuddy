@@ -122,3 +122,18 @@ def test_tool_errors_are_returned_not_raised():
 
 def test_not_connected_without_token(tmp_path):
     assert gm.load_credentials(tmp_path / "missing.json") is None
+
+
+def test_missing_arguments_return_a_hint_instead_of_failing():
+    svc = FakeService([full_message(body_plain="x")])
+    out = asyncio.run(gm.run_tool(gm.Gmail(svc), "search_emails", {}))
+    assert "missing query" in out["error"]
+    out = asyncio.run(gm.run_tool(gm.Gmail(svc), "read_email", {"email_id": "  "}))
+    assert "missing email_id" in out["error"]
+    assert all(t["required"] == [] for t in gm.TOOL_SPECS)  # Groq can't reject the reply
+
+
+def test_snippets_are_short():
+    m = full_message(body_plain="x")
+    m["snippet"] = "y" * 500
+    assert len(gm.summarize_message(m)["snippet"]) == gm.SNIPPET_CHARS

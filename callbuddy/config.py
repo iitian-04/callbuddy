@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     # S1 screen mode: a Groq model that can read images (gpt-oss is text-only).
     vision_model: str = "qwen/qwen3.8-27b"
     vision_reasoning_effort: str = "none"  # no "thinking" = fastest replies for voice
+    # Lower = steadier tool calls (at the default it sometimes skipped a search or sent junk text).
+    vision_temperature: float = 0.3
     # S2 memory: small fast text model that rewrites the session notes every few turns.
     memory_model: str = "openai/gpt-oss-20b"
     kokoro_voice: str = "af_heart"

@@ -36,6 +36,7 @@ TOKEN_FILE = SECRETS_DIR / "google_token.json"
 
 MAX_RESULTS = 5  # emails per search (Groq free tier: ~8,000 tokens/min)
 MAX_BODY_CHARS = 1500  # characters of an email body given to the LLM
+SNIPPET_CHARS = 120  # characters of preview per search result
 
 
 # --- auth ------------------------------------------------------------------------------
@@ -119,7 +120,7 @@ def summarize_message(msg: dict) -> dict:
         "from": h.get("from", ""),
         "subject": h.get("subject", ""),
         "date": h.get("date", ""),
-        "snippet": html.unescape(msg.get("snippet", "")),
+        "snippet": html.unescape(msg.get("snippet", ""))[:SNIPPET_CHARS],
         "unread": "UNREAD" in msg.get("labelIds", []),
     }
 
@@ -199,13 +200,13 @@ TOOL_SPECS = [
             "query": {"type": "string", "description": "Gmail search query"},
             "max_results": {"type": "integer", "description": "1 to 5, default 5"},
         },
-        "required": ["query"],
+        "required": [],
     },
     {
         "name": "read_email",
         "description": "Read one email by id (from search_emails). Returns from, to, subject, date and the body text.",
-        "properties": {"email_id": {"type": "string"}},
-        "required": ["email_id"],
+        "properties": {"email_id": {"type": "string", "description": "id from search_emails"}},
+        "required": [],
     },
     {
         "name": "create_draft",
@@ -217,13 +218,21 @@ TOOL_SPECS = [
             "body": {"type": "string", "description": "Plain-text email body"},
             "reply_to_email_id": {"type": "string", "description": "Id of the email being replied to, if any"},
         },
-        "required": ["to", "subject", "body"],
+        "required": [],
     },
 ]
 
 
+REQUIRED_ARGS = {"search_emails": ["query"], "read_email": ["email_id"], "create_draft": ["to", "subject", "body"]}
+
+
 async def run_tool(gmail: Gmail, name: str, args: dict) -> dict:
     """Run one Gmail tool in a worker thread (Google's client is blocking)."""
+    # Checked here instead of in the JSON schema: if Groq sees a missing required field it rejects
+    # the whole reply and the bot goes silent; this way the model gets a hint and tries again.
+    missing = [a for a in REQUIRED_ARGS.get(name, []) if not str(args.get(a) or "").strip()]
+    if missing:
+        return {"error": f"missing {', '.join(missing)}; call {name} again with it filled in"}
     try:
         if name == "search_emails":
             emails = await asyncio.to_thread(gmail.search, args["query"], args.get("max_results", MAX_RESULTS))

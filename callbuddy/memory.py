@@ -25,7 +25,7 @@ from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
 NOTES_MARKER = "[Call Buddy notes]"
 UPDATE_EVERY_TURNS = 3  # rewrite the notes after this many user turns
-KEEP_LAST_MESSAGES = 16  # older chat messages are trimmed (the notes keep the gist)
+KEEP_LAST_MESSAGES = 10  # older chat messages are trimmed (the notes keep the gist)
 MAX_NOTES = 8
 SESSIONS_DIR = Path("sessions")
 
@@ -68,7 +68,8 @@ def transcript(messages: list, limit: int = 30) -> str:
 def render_notes(task: str, notes: list[str], last_session: str = "") -> str:
     parts = [NOTES_MARKER]
     if last_session:
-        parts.append(f"Summary of the user's previous session:\n{last_session}")
+        # Capped: it is sent with every request and Groq's free tier is 8,000 tokens/min.
+        parts.append(f"Summary of the user's previous session:\n{last_session[:400]}")
     if task:
         parts.append(f"Current task: {task}")
     if notes:

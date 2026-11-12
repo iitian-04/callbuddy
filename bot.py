@@ -106,6 +106,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             model=settings.vision_model,
             system_instruction=build_screen_prompt(date.today().strftime("%A %d %B %Y"), gmail is not None),
             reasoning_effort=settings.vision_reasoning_effort,
+            temperature=settings.vision_temperature,
         )
     llm = GroqLLMService(api_key=settings.groq_api_key.get_secret_value(), settings=llm_settings)
 
