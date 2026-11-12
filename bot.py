@@ -56,6 +56,8 @@ from callbuddy.planner import plan_call  # noqa: E402
 from callbuddy.prompts import GREETING, SYSTEM_PROMPT, build_call_prompt  # noqa: E402
 from callbuddy.screen import ScreenInjector, add_screen_routes  # noqa: E402
 
+KOKORO_DIR = Path.home() / ".cache" / "pipecat" / "kokoro-onnx"
+
 # Set once at startup when --task is given. None means screen-buddy mode (the default).
 CALL_BRIEF: CallBrief | None = None
 
@@ -92,7 +94,15 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     llm = GroqLLMService(api_key=settings.groq_api_key.get_secret_value(), settings=llm_settings)
 
     # 3. TTS (text-to-speech): Kokoro runs locally on your CPU, free, no API key.
-    tts = KokoroTTSService(settings=KokoroTTSService.Settings(voice=settings.kokoro_voice))
+    model_path = KOKORO_DIR / settings.kokoro_model
+    if not model_path.exists():
+        # Pipecat would download the FULL model to this path if it is missing, so fall back.
+        logger.warning(f"{model_path} not found, using the default Kokoro model")
+        model_path = None
+    tts = KokoroTTSService(
+        model_path=str(model_path) if model_path else None,
+        settings=KokoroTTSService.Settings(voice=settings.kokoro_voice),
+    )
 
     # 4. Conversation memory. The user aggregator collects what you said into one
     #    message; Silero VAD (voice activity detection) decides when you started and

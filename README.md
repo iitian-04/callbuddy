@@ -20,6 +20,13 @@ uv run pytest                # unit tests (no API calls)
 
 `uv run pytest -m live` runs one real Groq request to check your key and model.
 
+## Faster voice (recommended on a laptop)
+The int8 Kokoro model is about 2x faster than the full one on CPU. Download it once:
+```bash
+curl -L -o ~/.cache/pipecat/kokoro-onnx/kokoro-v1.0.int8.onnx https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx
+```
+Without it, Call Buddy falls back to the full model.
+
 ## Troubleshooting
 - **First run is slow**: Kokoro downloads ~350 MB of model files to `~/.cache/pipecat/kokoro-onnx/`.
 - **Kokoro fails to load after a slow or interrupted download**: delete

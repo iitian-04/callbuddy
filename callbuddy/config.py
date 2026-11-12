@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     vision_model: str = "qwen/qwen3.8-27b"
     vision_reasoning_effort: str = "none"  # no "thinking" = fastest replies for voice
     kokoro_voice: str = "af_heart"
+    # Kokoro model file in ~/.cache/pipecat/kokoro-onnx/. The int8 (quantized) model is ~2x
+    # faster on the Mac's CPU than the full one (1.6 s vs 3.4 s for 7 s of speech) and 3.5x
+    # smaller. Set KOKORO_MODEL=kokoro-v1.0.onnx to go back to the full model.
+    kokoro_model: str = "kokoro-v1.0.int8.onnx"
     log_level: str = "INFO"
     # Phase 2: the name the agent says it is calling for, if the task doesn't give one.
     caller_name: str = "the user"
