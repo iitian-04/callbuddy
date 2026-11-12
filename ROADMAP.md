@@ -28,7 +28,7 @@ Goal: turn a text task into a plan the voice agent follows.
 - [x] Voice agent system prompt built from the CallBrief
 - [x] CLI: `uv run python bot.py --task "..."`
 - [x] Tests for planner with 3 example tasks
-- [ ] Role-played 3 calls (easy yes / alternative time / fully booked); failures in `notes/failures.md`
+- [x] Role-played 3 calls (easy yes / alternative time / fully booked); failures in `notes/failures.md`
 Done when: "book a table for 4 at 8 pm Sat, 7:30–9 ok" works; it accepts 8:15 and refuses 10 pm.
 
 ## Phase 3: Tools + summary (9–10 Nov)

@@ -16,7 +16,18 @@ SCENARIOS = [
     ("alternative 8:15", "Sorry, 8 is full. I can do 8:15 pm on Saturday for four, does that work?", True),
     ("only 10 pm", "We're fully booked until late. The only table for four on Saturday is at 10 pm.", False),
     ("easy yes", "Yes, 8 pm Saturday for four is available. Shall I book it?", True),
+    # From the 2026-11-12 voice role-play: speech-to-text wrote times like this.
+    ("stt 8.15", "8.15.", True),
+    ("stt 850", "and if we get 850, is it possible?", True),
 ]
+
+
+@pytest.mark.live
+def test_agent_gives_caller_name(setup):
+    client, model, brief = setup
+    reply = agent_reply(client, model, brief, "What is the name?")
+    print(f"\n[name] agent: {reply}")
+    assert "Priyanshu" in reply
 
 
 @pytest.fixture(scope="module")

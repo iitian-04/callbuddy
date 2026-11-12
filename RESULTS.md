@@ -39,3 +39,8 @@ violations) with ~Y s average response latency, at near-zero cost.
   call prompt from the brief, `bot.py --task`. 16 unit tests pass. Live: planner gave a valid brief for
   "Book a table for 4 at 8 pm Saturday, 7:30-9 ok" (window 7:30-9:00 pm); text role-play with Groq:
   accepted 8:15 pm, refused 10 pm, accepted 8 pm (3/3). Voice role-play still to do.
+- 2026-11-12: Phase 2 voice role-plays (2 sessions, voice af_sky). Fixed: opening line repeated on
+  interruption, digits read aloud badly, window revealed up front, booking name not given, STT time
+  formats ("850", "8.15") misread. See notes/failures.md. Live text checks 6/6 (accept 8:15, 8:50,
+  8 pm; refuse 10 pm; gives name). Session 2 TTFB avg: STT 0.61 s, LLM 0.40 s, Kokoro TTS 1.95 s
+  (max 5.66 s). Bot process RSS after 2 calls: 656 MB.

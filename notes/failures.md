@@ -21,6 +21,20 @@ Real failures seen while testing, with the fix. Newest last.
 - Fix: planner rule: details_to_share holds the preferred option only; the range is used
   only to judge offers.
 
+## 4. Didn't give the booking name (Phase 2, voice role-play #2, 2026-11-12)
+- Seen: restaurant asked "What is the name?"; agent said "I'm an AI assistant helping
+  Priyanshu; I don't have a name to give."
+- Cause: nothing told it the caller's name is the booking name.
+- Fix: planner always puts "name for the booking: <caller>" in details_to_share; prompt says
+  to give the caller's name when asked. Live test `test_agent_gives_caller_name` added.
+
+## 5. Misread spoken times from speech-to-text (Phase 2, voice role-play #2, 2026-11-12)
+- Seen: STT wrote "850" (8:50, inside the window) and the agent refused; STT wrote "8.15."
+  and the agent said it would "check with Priyanshu" instead of accepting.
+- Cause: the LLM didn't treat "850" / "8.15" as times.
+- Fix: prompt explains these STT formats and says to accept times inside the acceptable
+  outcomes, or ask to repeat if unclear. Live scenarios "stt 8.15" and "stt 850" added; both pass.
+
 ## Open: Kokoro "TTS context completed with no audio" errors
-- Seen in every session (4-5 times per call). Non-fatal: speech continues. Cause not yet
+- Seen in every session (4-5 times per call; also right after the TTSSpeakFrame opening line). Non-fatal: speech continues. Cause not yet
   found; to investigate.
