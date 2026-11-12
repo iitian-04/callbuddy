@@ -20,9 +20,12 @@ class Settings(BaseSettings):
     # extra="ignore": other variables in .env (e.g. Twilio, later phases) don't cause errors.
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # Required: no default, so startup fails if they're missing.
-    deepgram_api_key: SecretStr
+    # Required: no default, so startup fails if it's missing.
     groq_api_key: SecretStr
+    # Optional: with a Deepgram key, speech-to-text uses Deepgram (streaming, fastest).
+    # Without one, it uses Groq's hosted Whisper with the same Groq key (no extra account).
+    deepgram_api_key: SecretStr | None = None
+    stt_provider: str = "auto"  # auto | deepgram | groq
 
     # Optional, with defaults.
     # llama-3.3-70b-versatile was shut down by Groq on 16 Aug 2026; gpt-oss-120b replaces it.
@@ -31,6 +34,13 @@ class Settings(BaseSettings):
     groq_reasoning_effort: str = "low"
     kokoro_voice: str = "af_heart"
     log_level: str = "INFO"
+
+    @property
+    def resolved_stt_provider(self) -> str:
+        if self.stt_provider != "auto":
+            return self.stt_provider
+        has_dg = self.deepgram_api_key is not None and self.deepgram_api_key.get_secret_value() != ""
+        return "deepgram" if has_dg else "groq"
 
 
 def load_settings(**overrides) -> Settings:

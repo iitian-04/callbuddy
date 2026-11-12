@@ -8,7 +8,7 @@ def test_missing_keys_give_a_clear_error(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("DEEPGRAM_API_KEY", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    with pytest.raises(ConfigError, match="DEEPGRAM_API_KEY.*GROQ_API_KEY"):
+    with pytest.raises(ConfigError, match="GROQ_API_KEY"):
         load_settings()
 
 
@@ -34,3 +34,12 @@ def test_reads_dotenv_file(monkeypatch, tmp_path):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     (tmp_path / ".env").write_text("DEEPGRAM_API_KEY=x\nGROQ_API_KEY=y\nGROQ_MODEL=m\n")
     assert load_settings().groq_model == "m"
+
+
+def test_stt_falls_back_to_groq_without_deepgram_key(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("DEEPGRAM_API_KEY", raising=False)
+    monkeypatch.delenv("STT_PROVIDER", raising=False)
+    assert load_settings(groq_api_key="g").resolved_stt_provider == "groq"
+    assert load_settings(groq_api_key="g", deepgram_api_key="d").resolved_stt_provider == "deepgram"
+    assert load_settings(groq_api_key="g", deepgram_api_key="").resolved_stt_provider == "groq"

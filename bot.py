@@ -20,7 +20,10 @@ from callbuddy.logging_setup import setup_logging
 settings = load_settings()
 setup_logging(
     settings.log_level,
-    secrets=[settings.deepgram_api_key.get_secret_value(), settings.groq_api_key.get_secret_value()],
+    secrets=[
+        settings.groq_api_key.get_secret_value(),
+        settings.deepgram_api_key.get_secret_value() if settings.deepgram_api_key else "",
+    ],
 )
 
 logger.info("Loading Pipecat (first run downloads the Silero and Kokoro models)...")
@@ -37,7 +40,6 @@ from pipecat.processors.aggregators.llm_response_universal import (  # noqa: E40
 )
 from pipecat.runner.types import RunnerArguments  # noqa: E402
 from pipecat.runner.utils import create_transport  # noqa: E402
-from pipecat.services.deepgram.stt import DeepgramSTTService  # noqa: E402
 from pipecat.services.groq.llm import GroqLLMService  # noqa: E402
 from pipecat.services.kokoro.tts import KokoroTTSService  # noqa: E402
 from pipecat.transports.base_transport import BaseTransport, TransportParams  # noqa: E402
@@ -46,8 +48,17 @@ from callbuddy.prompts import GREETING_INSTRUCTION, SYSTEM_PROMPT  # noqa: E402
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
-    # 1. STT (speech-to-text): streams your audio to Deepgram, gets text back.
-    stt = DeepgramSTTService(api_key=settings.deepgram_api_key.get_secret_value())
+    # 1. STT (speech-to-text): Deepgram if you have a key (streams audio, fastest),
+    #    otherwise Groq's hosted Whisper (sends each finished utterance, same Groq key).
+    if settings.resolved_stt_provider == "deepgram":
+        from pipecat.services.deepgram.stt import DeepgramSTTService
+
+        stt = DeepgramSTTService(api_key=settings.deepgram_api_key.get_secret_value())
+    else:
+        from pipecat.services.groq.stt import GroqSTTService
+
+        stt = GroqSTTService(api_key=settings.groq_api_key.get_secret_value())
+    logger.info(f"STT provider: {settings.resolved_stt_provider}")
 
     # 2. LLM (the brain): Groq's OpenAI-compatible API. Streams the reply token by token,
     #    so TTS can start speaking before the whole answer is finished.
