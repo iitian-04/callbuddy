@@ -26,6 +26,23 @@ def split_sentences(text: str) -> list[str]:
     return [p for p in re.split(r"(?<=[.!?])\s+", text.strip()) if p]
 
 
+GMAIL_PROMPT = """
+Gmail: you can search and read the user's Gmail with your tools, and save reply DRAFTS.
+- Today is {today}. For dates, prefer Gmail's relative search like newer_than:2d or newer_than:7d.
+- Search first, then read only the one or two emails that matter. Summarize in a sentence or two;
+  don't read whole emails aloud unless asked.
+- Drafts: before calling create_draft, say the draft in one or two short sentences and ask
+  "Should I save it to your drafts?". Only save after a clear yes. Always say it was saved as a
+  draft and that they send it themselves. You cannot send, delete or change emails.
+- Never read out passwords, codes, card or bank numbers from emails."""
+
+
+def build_screen_prompt(today: str, gmail: bool) -> str:
+    """The screen-buddy system prompt, plus Gmail rules when Gmail is connected."""
+    return SYSTEM_PROMPT + (GMAIL_PROMPT.format(today=today) if gmail else
+                            f" Today is {today}.")
+
+
 # Spoken word for word when you connect (no LLM call), so the disclaimer is always said.
 GREETING = (
     "Hi, I'm Call Buddy, an AI assistant. "

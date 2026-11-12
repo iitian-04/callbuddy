@@ -20,6 +20,21 @@ uv run pytest                # unit tests (no API calls)
 
 `uv run pytest -m live` runs one real Groq request to check your key and model.
 
+## Gmail (optional): search, read, and save reply drafts
+Call Buddy can search and read your Gmail and save reply **drafts** (it can't send, delete or
+change mail; you send drafts yourself). One-time setup, all free:
+1. https://console.cloud.google.com → create a project "Call Buddy".
+2. APIs & Services → Library → "Gmail API" → Enable.
+3. APIs & Services → OAuth consent screen: User type **External**; app name "Call Buddy"; your
+   email as support + developer contact; Scopes: skip; Test users: **add your own Gmail address**.
+4. APIs & Services → Credentials → Create credentials → OAuth client ID → Application type
+   **Desktop app** → Create → **Download JSON** → save it as `secrets/google_credentials.json`.
+5. `uv run python -m callbuddy.gmail auth` → Google opens → pick your account → "Google hasn't
+   verified this app" → Continue → allow → done. Token saved to `secrets/google_token.json`.
+6. `uv run python -m callbuddy.gmail test` lists your last 3 emails. Restart the bot.
+`secrets/` is gitignored. To disconnect: delete `secrets/google_token.json` and remove "Call Buddy" at
+myaccount.google.com → Security → Third-party connections. Email text you ask about is sent to Groq.
+
 ## Faster voice (recommended on a laptop)
 The int8 Kokoro model is about 2x faster than the full one on CPU. Download it once:
 ```bash

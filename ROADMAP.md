@@ -58,17 +58,24 @@ Done when: you share a screen with an error and it explains the error out loud.
 - [x] Tests for the notes logic (unit + live)
 - [ ] Real test: work for a few minutes, ask "what was I doing?", reconnect and ask again
 
-## S3: Suggestions (still read-only)
+## S3: Gmail (12 Nov)
+- [x] `callbuddy/gmail.py`: OAuth (gmail.readonly + gmail.compose), token in `secrets/` (gitignored)
+- [x] LLM tools: search_emails (max 5), read_email (body cut to 1,500 chars), create_draft
+- [x] Drafts only: no send/delete code at all; bot reads the draft back and asks before saving
+- [x] Unit tests with a fake Gmail service; live test: model searches `newer_than:7d`, asks before drafting
+- [ ] User connects Gmail (Google Cloud OAuth client, one-time) and tests by voice
+
+## S4: Suggestions (still read-only)
 - [ ] Notices changes on screen (new error, failed test, new message) and offers a hint
 - [ ] Rate limit: at most one unprompted hint per minute; "be quiet" mutes it
 - [ ] Tests for the change detector
 
-## S4: Safe actions with your OK
+## S5: Safe actions with your OK
 - [ ] Small allow-list of tools: open URL, open app, draft text to clipboard, make a note
 - [ ] Always asks "Should I do X?" and waits for a yes; nothing destructive, no passwords/payments
 - [ ] Every tool has a pytest test
 
-## S5: Phone calls for you
+## S6: Phone calls for you
 - [ ] Reuse the Phase 2 call planner; Twilio trial (my number + consenting friends only)
 - [ ] Tools: check calendar, record outcome, end call; 3-line summary after the call
 - [ ] Only call numbers I give explicitly for that run

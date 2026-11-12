@@ -15,3 +15,13 @@ def test_greeting_discloses_ai_and_privacy():
 def test_split_sentences_for_faster_first_audio():
     assert split_sentences("Hi, I'm Call Buddy. Ready? Go!") == ["Hi, I'm Call Buddy.", "Ready?", "Go!"]
     assert split_sentences(GREETING)[0] == "Hi, I'm Call Buddy, an AI assistant."
+
+
+def test_screen_prompt_has_date_and_gmail_rules_only_when_connected():
+    from callbuddy.prompts import build_screen_prompt
+
+    on = build_screen_prompt("Thursday 12 November 2026", gmail=True)
+    off = build_screen_prompt("Thursday 12 November 2026", gmail=False)
+    assert "12 November 2026" in on and "12 November 2026" in off
+    assert "create_draft" in on and "cannot send" in on
+    assert "Gmail" not in off

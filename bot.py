@@ -17,6 +17,7 @@ How a voice turn flows through the pipeline (each box is a Pipecat "processor";
 
 import argparse
 import asyncio
+from datetime import date
 from pathlib import Path
 
 from loguru import logger
@@ -58,7 +59,13 @@ from pipecat.transports.base_transport import BaseTransport, TransportParams  # 
 
 from callbuddy.brief import CallBrief  # noqa: E402
 from callbuddy.planner import plan_call  # noqa: E402
-from callbuddy.prompts import GREETING, SYSTEM_PROMPT, build_call_prompt, split_sentences  # noqa: E402
+from callbuddy.gmail import Gmail, register_gmail_tools  # noqa: E402
+from callbuddy.prompts import (  # noqa: E402
+    GREETING,
+    build_call_prompt,
+    build_screen_prompt,
+    split_sentences,
+)
 from callbuddy.memory import MemoryProcessor, SessionMemory  # noqa: E402
 from callbuddy.screen import ScreenInjector, add_screen_routes  # noqa: E402
 
@@ -92,9 +99,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             reasoning_effort=settings.groq_reasoning_effort,
         )
     else:
+        # Gmail tools only if you connected Gmail (uv run python -m callbuddy.gmail auth).
+        gmail = Gmail.from_saved_token()
+        logger.info("Gmail: connected" if gmail else "Gmail: not connected")
         llm_settings = GroqLLMService.Settings(
             model=settings.vision_model,
-            system_instruction=SYSTEM_PROMPT,
+            system_instruction=build_screen_prompt(date.today().strftime("%A %d %B %Y"), gmail is not None),
             reasoning_effort=settings.vision_reasoning_effort,
         )
     llm = GroqLLMService(api_key=settings.groq_api_key.get_secret_value(), settings=llm_settings)
@@ -114,7 +124,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     #    message; Silero VAD (voice activity detection) decides when you started and
     #    stopped talking. When VAD hears you start talking while the bot is speaking,
     #    Pipecat sends an "interruption" and the bot stops (barge-in).
-    context = LLMContext()
+    tools = register_gmail_tools(llm, gmail) if (not CALL_BRIEF and gmail) else None
+    context = LLMContext(tools=tools) if tools else LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(

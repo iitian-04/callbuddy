@@ -63,3 +63,6 @@ violations) with ~Y s average response latency, at near-zero cost.
   Problems: replies cancelled by short follow-ups; Groq free tier 8,000 tokens/min for qwen with
   ~800-1,500 tokens per screenshot. Fixed (failures.md #8). Model gave two different token figures
   (400 billion, then 1.83 billion) for the same email.
+- 2026-11-12: S3 Gmail built (search/read/draft, no send). 43 unit tests pass. Live: qwen chose
+  search_emails with "from:quasa newer_than:7d"; for "draft a reply" it searched first instead of saving.
+  Not yet connected to a real Gmail account.
