@@ -49,10 +49,14 @@ Goal: share your screen, talk, and Call Buddy answers about what's on it. No act
 - [ ] Real test: share screen, ask about an error / an email / a web page (3 checks)
 Done when: you share a screen with an error and it explains the error out loud.
 
-## S2: Memory (session)
-- [ ] Running notes of what you're working on (app, file, task), updated every few turns
-- [ ] "What was I doing?" works; short summary when you disconnect, saved to `notes/sessions/`
-- [ ] Tests for the notes logic
+## S2: Memory (session) (12 Nov)
+- [x] Running notes of what you're working on (task, app/file, findings, next steps), rewritten every
+      3 turns by a small model (`openai/gpt-oss-20b`) in the background, from chat text only
+- [x] Old turns trimmed to the last 16 messages; the notes keep the gist (faster, cheaper requests)
+- [x] Short summary when you disconnect, saved to `sessions/` (gitignored: may contain screen
+      content, so not `notes/sessions/` as first planned); next session starts with it
+- [x] Tests for the notes logic (unit + live)
+- [ ] Real test: work for a few minutes, ask "what was I doing?", reconnect and ask again
 
 ## S3: Suggestions (still read-only)
 - [ ] Notices changes on screen (new error, failed test, new message) and offers a hint

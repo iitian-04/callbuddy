@@ -53,3 +53,7 @@ violations) with ~Y s average response latency, at near-zero cost.
   amount) and converted an amount to rupees on request (rate from model knowledge, not live). TTFB avg:
   STT 0.64 s, LLM (qwen3.8-27b + image) 0.79 s (max 2.61), Kokoro 3.83 s (max 13.5). RSS 525 MB.
   Still to test: an error message on screen (S1 "done when").
+- 2026-11-12: Voice speed: Kokoro on this Mac ran at ~real time (7 s sentence: 3.4-7 s). int8 model:
+  1.6 s for 7 s of audio (2.1x faster than full, fp16 2.6 s, CoreML no gain). Now the default.
+- 2026-11-12: S2 memory: notes every 3 turns with gpt-oss-20b, context trimmed to 16 messages, session
+  summary to sessions/ on disconnect. 33 unit tests pass; live notes test: 8 useful notes from a 4-turn chat.

@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     # S1 screen mode: a Groq model that can read images (gpt-oss is text-only).
     vision_model: str = "qwen/qwen3.8-27b"
     vision_reasoning_effort: str = "none"  # no "thinking" = fastest replies for voice
+    # S2 memory: small fast text model that rewrites the session notes every few turns.
+    memory_model: str = "openai/gpt-oss-20b"
     kokoro_voice: str = "af_heart"
     # Kokoro model file in ~/.cache/pipecat/kokoro-onnx/. The int8 (quantized) model is ~2x
     # faster on the Mac's CPU than the full one (1.6 s vs 3.4 s for 7 s of speech) and 3.5x

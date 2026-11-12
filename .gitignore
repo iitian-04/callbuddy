@@ -5,6 +5,7 @@
 
 # Runtime output (may contain personal data / phone numbers)
 transcripts/
+sessions/
 results/
 recordings/
 logs/

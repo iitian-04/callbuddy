@@ -16,6 +16,7 @@ How a voice turn flows through the pipeline (each box is a Pipecat "processor";
 """
 
 import argparse
+import asyncio
 from pathlib import Path
 
 from loguru import logger
@@ -54,6 +55,7 @@ from pipecat.transports.base_transport import BaseTransport, TransportParams  # 
 from callbuddy.brief import CallBrief  # noqa: E402
 from callbuddy.planner import plan_call  # noqa: E402
 from callbuddy.prompts import GREETING, SYSTEM_PROMPT, build_call_prompt  # noqa: E402
+from callbuddy.memory import MemoryProcessor, SessionMemory  # noqa: E402
 from callbuddy.screen import ScreenInjector, add_screen_routes  # noqa: E402
 
 KOKORO_DIR = Path.home() / ".cache" / "pipecat" / "kokoro-onnx"
@@ -114,11 +116,25 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
     )
 
+    # 5. Memory (screen mode): short notes about what you're working on, a summary on exit.
+    memory = None
+    if not CALL_BRIEF:
+        from openai import AsyncOpenAI
+
+        notes_client = AsyncOpenAI(
+            api_key=settings.groq_api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1"
+        )
+        memory = SessionMemory(notes_client, settings.memory_model)
+        if memory.last_session:
+            logger.info("Memory: loaded the summary of your previous session")
+    memory_processors = [MemoryProcessor(memory)] if memory else []
+
     pipeline = Pipeline(
         [
             transport.input(),  # audio from the browser mic
             stt,  # audio -> text
             user_aggregator,  # text -> "user said X" in the context
+            *memory_processors,  # notes at the top, old turns trimmed (screen mode only)
             ScreenInjector(),  # adds "this is my screen right now" + newest screenshot
             llm,  # context -> reply text (streamed)
             tts,  # reply text -> audio
@@ -148,6 +164,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Client disconnected")
+        if memory:
+            # Save a short summary of this session to sessions/ (gitignored), max 15 s.
+            try:
+                await asyncio.wait_for(memory.finish(context.get_messages()), timeout=15)
+            except asyncio.TimeoutError:
+                logger.warning("Session summary took too long, skipped")
         await task.cancel()
 
     runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
