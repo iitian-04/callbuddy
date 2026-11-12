@@ -1,6 +1,8 @@
 """CallBuddy voice bot (Phase 1): talk to it in your browser.
 
-Run:   uv run python bot.py
+Run:   uv run python bot.py                      (free chat)
+       uv run python bot.py --task "Book a table for 4 at 8 pm Saturday, 7:30-9 ok"
+                                                  (call mode: you play the restaurant)
 Open:  http://localhost:7860/client  and click Connect (use headphones!)
 
 How a voice turn flows through the pipeline (each box is a Pipecat "processor";
@@ -10,6 +12,8 @@ How a voice turn flows through the pipeline (each box is a Pipecat "processor";
             -> [LLM: Groq] -> [TTS: Kokoro] -> [transport.output] -> your speakers
             -> [assistant aggregator] (remembers what the bot actually said)
 """
+
+import argparse
 
 from loguru import logger
 
@@ -44,7 +48,17 @@ from pipecat.services.groq.llm import GroqLLMService  # noqa: E402
 from pipecat.services.kokoro.tts import KokoroTTSService  # noqa: E402
 from pipecat.transports.base_transport import BaseTransport, TransportParams  # noqa: E402
 
-from callbuddy.prompts import GREETING_INSTRUCTION, SYSTEM_PROMPT  # noqa: E402
+from callbuddy.brief import CallBrief  # noqa: E402
+from callbuddy.planner import plan_call  # noqa: E402
+from callbuddy.prompts import (  # noqa: E402
+    GREETING_INSTRUCTION,
+    SYSTEM_PROMPT,
+    build_call_prompt,
+    call_opening_instruction,
+)
+
+# Set once at startup when --task is given. None means free-chat mode (Phase 1).
+CALL_BRIEF: CallBrief | None = None
 
 
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
@@ -66,7 +80,8 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         api_key=settings.groq_api_key.get_secret_value(),
         settings=GroqLLMService.Settings(
             model=settings.groq_model,
-            system_instruction=SYSTEM_PROMPT,
+            # Call mode: rules come from the CallBrief. Free chat: the short Phase 1 prompt.
+            system_instruction=build_call_prompt(CALL_BRIEF) if CALL_BRIEF else SYSTEM_PROMPT,
             reasoning_effort=settings.groq_reasoning_effort,
         ),
     )
@@ -104,8 +119,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Client connected")
-        # Ask the LLM to greet first, so you know it's working.
-        context.add_message({"role": "developer", "content": GREETING_INSTRUCTION})
+        # The bot speaks first: the planned opening line in call mode, a hello otherwise.
+        first = call_opening_instruction(CALL_BRIEF) if CALL_BRIEF else GREETING_INSTRUCTION
+        context.add_message({"role": "developer", "content": first})
         await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
@@ -132,4 +148,22 @@ if __name__ == "__main__":
     # at /client, and calls bot() for each browser that connects.
     from pipecat.runner.run import main
 
-    main()
+    # Our own flag. The same parser is handed to Pipecat's runner, which adds its flags
+    # (--host, --port, ...) to it, so `--task` and the runner flags work together.
+    parser = argparse.ArgumentParser(description="CallBuddy voice bot")
+    parser.add_argument("--task", help="Task for the call, e.g. 'Book a table for 4 at 8 pm Sat'")
+    known, _ = parser.parse_known_args()
+
+    if known.task:
+        # Plan once at startup, so a bad plan fails before anyone connects.
+        CALL_BRIEF = plan_call(
+            known.task,
+            api_key=settings.groq_api_key.get_secret_value(),
+            model=settings.groq_model,
+            default_name=settings.caller_name or "the user",
+        )
+        logger.info("Call brief:\n" + CALL_BRIEF.model_dump_json(indent=2))
+    else:
+        logger.info("No --task given: free-chat mode")
+
+    main(parser)

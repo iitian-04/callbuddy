@@ -35,3 +35,7 @@ violations) with ~Y s average response latency, at near-zero cost.
 - 2026-11-06: Phase 0 scaffold (uv project, Python 3.12, pinned pipecat-ai 1.15.0, .gitignore, .env.example,
   CI) and Phase 1 bot.py written. 8 unit tests pass. Server starts and serves /client. Not yet talked to
   with real keys.
+- 2026-11-12: Phase 2 call brief: brief.py (CallBrief), planner.py (Groq JSON + 1 self-correction retry),
+  call prompt from the brief, `bot.py --task`. 16 unit tests pass. Live: planner gave a valid brief for
+  "Book a table for 4 at 8 pm Saturday, 7:30-9 ok" (window 7:30-9:00 pm); text role-play with Groq:
+  accepted 8:15 pm, refused 10 pm, accepted 8 pm (3/3). Voice role-play still to do.

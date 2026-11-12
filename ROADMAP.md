@@ -23,11 +23,11 @@ Done when: it answers out loud and stops when I interrupt.
 
 ## Phase 2: Call brief (8 Nov)
 Goal: turn a text task into a plan the voice agent follows.
-- [ ] `planner.py` → `CallBrief` (Pydantic): goal, caller_name, details_to_share,
+- [x] `planner.py` → `CallBrief` (Pydantic): goal, caller_name, details_to_share,
       acceptable_options, must_not_do, give_up_after, opening_line (says it's an AI)
-- [ ] Voice agent system prompt built from the CallBrief
-- [ ] CLI: `uv run python bot.py --task "..."`
-- [ ] Tests for planner with 3 example tasks
+- [x] Voice agent system prompt built from the CallBrief
+- [x] CLI: `uv run python bot.py --task "..."`
+- [x] Tests for planner with 3 example tasks
 - [ ] Role-played 3 calls (easy yes / alternative time / fully booked); failures in `notes/failures.md`
 Done when: "book a table for 4 at 8 pm Sat, 7:30–9 ok" works; it accepts 8:15 and refuses 10 pm.
 

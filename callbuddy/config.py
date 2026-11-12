@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     groq_reasoning_effort: str = "low"
     kokoro_voice: str = "af_heart"
     log_level: str = "INFO"
+    # Phase 2: the name the agent says it is calling for, if the task doesn't give one.
+    caller_name: str = "the user"
 
     @property
     def resolved_stt_provider(self) -> str:
