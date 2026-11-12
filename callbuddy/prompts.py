@@ -18,6 +18,13 @@ SYSTEM_PROMPT = (
     "never digits like 8:15 or 9:00."
 )
 
+def split_sentences(text: str) -> list[str]:
+    """'Hi. How are you?' -> ['Hi.', 'How are you?'] (simple: split after . ! ? and a space)."""
+    import re
+
+    return [p for p in re.split(r"(?<=[.!?])\s+", text.strip()) if p]
+
+
 # Spoken word for word when you connect (no LLM call), so the disclaimer is always said.
 GREETING = (
     "Hi, I'm Call Buddy, an AI assistant. "

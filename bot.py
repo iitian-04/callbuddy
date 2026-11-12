@@ -54,7 +54,7 @@ from pipecat.transports.base_transport import BaseTransport, TransportParams  # 
 
 from callbuddy.brief import CallBrief  # noqa: E402
 from callbuddy.planner import plan_call  # noqa: E402
-from callbuddy.prompts import GREETING, SYSTEM_PROMPT, build_call_prompt  # noqa: E402
+from callbuddy.prompts import GREETING, SYSTEM_PROMPT, build_call_prompt, split_sentences  # noqa: E402
 from callbuddy.memory import MemoryProcessor, SessionMemory  # noqa: E402
 from callbuddy.screen import ScreenInjector, add_screen_routes  # noqa: E402
 
@@ -159,7 +159,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             await task.queue_frames([TTSSpeakFrame(CALL_BRIEF.opening_line)])
         else:
             # Screen mode: fixed greeting with the privacy disclaimer, spoken word for word.
-            await task.queue_frames([TTSSpeakFrame(GREETING)])
+            # One frame per sentence: Kokoro makes each frame in one go, so the whole greeting
+            # as one frame took ~10 s before you heard anything; the first sentence takes ~1 s.
+            await task.queue_frames([TTSSpeakFrame(s) for s in split_sentences(GREETING)])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
