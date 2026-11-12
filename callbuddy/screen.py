@@ -1,38 +1,35 @@
-"""Screen understanding (S1): let the LLM see the latest picture of your shared screen.
+"""Screen understanding: Call Buddy can look at your shared screen when you ask about it.
 
 How screenshots reach the bot (no video over WebRTC):
 
   Call Buddy page (/buddy) --- every 2 s: small JPEG, HTTP POST /screen ---> ScreenStore
-  mic audio -> ... -> user aggregator -> [ScreenInjector] -> LLM
 
-Why not WebRTC screen video? We tried: the bot had to decode a full-resolution screen
-stream at up to 30 fps in Python. That froze the event loop for ~30 s, the audio output
-timed out, and you stopped hearing the bot (notes/failures.md #6). Now the BROWSER does the
-work: it grabs a frame, shrinks it to max 1280 px and sends one JPEG every 2 seconds.
+Why not WebRTC screen video? Decoding a full-resolution stream in Python froze the bot for
+~30 s and the audio died (notes/failures.md #6). The browser now sends one JPEG every 2 s.
 
-- ScreenStore keeps ONLY the newest screenshot in memory (nothing is saved to disk).
-- ScreenInjector runs right before the LLM. Each time you finish speaking, it adds the
-  newest screenshot to the conversation as "this is my screen right now". Older
-  screenshots are replaced by a short note, so the context doesn't grow every turn.
+"Vision as a tool" (notes/failures.md #10): the main brain is a fast text model. When you ask
+about your screen, it calls the tool `look_at_screen(question)`; only then is the newest
+screenshot sent to a vision model, which answers the question in words. Before, we attached a
+screenshot to EVERY turn: ~1,000 extra tokens each time on Groq's 8,000 tokens/minute free tier.
+ScreenStore keeps ONLY the newest screenshot in memory; nothing is saved to disk.
 """
 
+import base64
 import io
 import time
 from dataclasses import dataclass
 
 from loguru import logger
 from PIL import Image
-from pipecat.frames.frames import Frame, LLMContextFrame
-from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
 MAX_SIDE = 1024  # px; readable text, fewer image tokens (Groq free tier: 8,000 tokens/min)
 MAX_UPLOAD_BYTES = 3 * 1024 * 1024  # reject anything bigger than 3 MB
 MAX_AGE_S = 10.0  # ignore a screenshot older than this (sharing probably stopped)
-OLD_SCREENSHOT_NOTE = "[older screenshot removed]"
-SCREENSHOT_TEXT = "This is my screen right now."
-# Groq's free tier allows qwen 8,000 tokens per minute and one screenshot costs ~800-1,500
-# tokens, so short replies ("yes", "thank you", "so,") get no screenshot (notes/failures.md #8).
-MIN_WORDS_FOR_SCREENSHOT = 4
+
+VISION_PROMPT = """You look at a screenshot of the user's screen and answer their question about it.
+Be concise (at most 3 sentences unless asked for more). Quote exact text, names and numbers you
+see. If the answer isn't visible on the screenshot, say exactly that. Don't read out passwords,
+codes, or card/bank numbers."""
 
 
 @dataclass
@@ -88,62 +85,43 @@ class ScreenStore:
 SCREEN_STORE = ScreenStore()
 
 
-def strip_old_screenshots(messages: list) -> list:
-    """Return messages with every image part replaced by a short text note."""
-    cleaned = []
-    for m in messages:
-        content = m.get("content") if isinstance(m, dict) else None
-        if isinstance(content, list) and any(p.get("type") == "image_url" for p in content):
-            parts = [p for p in content if p.get("type") != "image_url"]
-            parts.append({"type": "text", "text": OLD_SCREENSHOT_NOTE})
-            m = {**m, "content": parts}
-        cleaned.append(m)
-    return cleaned
+LOOK_AT_SCREEN_SPEC = {
+    "name": "look_at_screen",
+    "description": "Look at the user's shared screen right now and answer a question about it. "
+    "Use this whenever the user refers to their screen or says things like 'this', 'here', "
+    "'what's this error', 'summarize this page'.",
+    "properties": {
+        "question": {"type": "string", "description": "What to find out from the screen, in full"},
+    },
+    "required": [],  # checked in code: a missing field makes Groq reject the whole reply
+}
 
 
-async def attach_screenshot(context, shot: Screenshot) -> None:
-    """Replace older screenshots in `context` with a note, then add `shot` as the newest."""
-    context.set_messages(strip_old_screenshots(context.get_messages()))
-    await context.add_image_frame_message(
-        format="image/jpeg", size=shot.size, image=shot.jpeg, text=SCREENSHOT_TEXT
-    )
-    logger.debug(f"Attached screenshot {shot.size[0]}x{shot.size[1]}, {len(shot.jpeg) // 1024} KB")
-
-
-def last_user_text(messages: list) -> str:
-    for m in reversed(messages):
-        if isinstance(m, dict) and m.get("role") == "user":
-            c = m.get("content")
-            if isinstance(c, str):
-                return c
-            if isinstance(c, list):
-                return " ".join(p.get("text", "") for p in c if p.get("type") == "text")
-    return ""
-
-
-def wants_screenshot(messages: list) -> bool:
-    """Only attach a screenshot when the user said something substantial."""
-    return len(last_user_text(messages).split()) >= MIN_WORDS_FOR_SCREENSHOT
-
-
-class ScreenInjector(FrameProcessor):
-    """Adds the newest screenshot to the context just before each LLM request."""
-
-    def __init__(self, store: ScreenStore = SCREEN_STORE, **kwargs):
-        super().__init__(**kwargs)
-        self._store = store
-
-    async def process_frame(self, frame: Frame, direction: FrameDirection):
-        await super().process_frame(frame, direction)
-        if isinstance(frame, LLMContextFrame):
-            ctx = frame.context
-            shot = self._store.fresh()
-            if shot is not None and wants_screenshot(ctx.get_messages()):
-                await attach_screenshot(ctx, shot)
-            else:
-                # Short reply or no screen: send no image at all this turn (saves tokens).
-                ctx.set_messages(strip_old_screenshots(ctx.get_messages()))
-        await self.push_frame(frame, direction)
+async def look_at_screen(client, model: str, question: str, store: "ScreenStore", temperature: float = 0.2) -> dict:
+    """Ask the vision model about the newest screenshot. `client` is an AsyncOpenAI."""
+    shot = store.fresh()
+    if shot is None:
+        return {"error": "No screen is being shared. Ask the user to click the blue 'Share screen' "
+                "button at the top of the page and pick a window."}
+    question = (question or "").strip() or "Describe what is on the screen."
+    url = "data:image/jpeg;base64," + base64.b64encode(shot.jpeg).decode()
+    try:
+        r = await client.chat.completions.create(
+            model=model,
+            temperature=temperature,
+            reasoning_effort="none",
+            messages=[
+                {"role": "system", "content": VISION_PROMPT},
+                {"role": "user", "content": [{"type": "text", "text": question},
+                                             {"type": "image_url", "image_url": {"url": url}}]},
+            ],
+        )
+    except Exception as e:
+        logger.warning(f"look_at_screen failed: {e}")
+        return {"error": str(e)[:300]}
+    answer = (r.choices[0].message.content or "").strip()
+    logger.info(f"look_at_screen({question!r}) -> {len(answer)} chars")
+    return {"seen_on_screen": answer}
 
 
 def add_screen_routes(app, store: ScreenStore = SCREEN_STORE, page_html: str = "") -> None:

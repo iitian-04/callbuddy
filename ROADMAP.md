@@ -59,6 +59,8 @@ Done when: you share a screen with an error and it explains the error out loud.
 - [ ] Real test: work for a few minutes, ask "what was I doing?", reconnect and ask again
 
 ## S3: Gmail (12 Nov)
+- [x] Redesign: gpt-oss-120b is the main brain; screen via `look_at_screen` tool (vision model only
+      when asked); tools survive interruptions; noise transcriptions dropped (failures.md #10)
 - [x] `callbuddy/gmail.py`: OAuth (gmail.readonly + gmail.compose), token in `secrets/` (gitignored)
 - [x] LLM tools: search_emails (max 5), read_email (body cut to 1,500 chars), create_draft
 - [x] Drafts only: no send/delete code at all; bot reads the draft back and asks before saving

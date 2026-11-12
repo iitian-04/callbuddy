@@ -2,12 +2,12 @@
 
 import asyncio
 import io
+from types import SimpleNamespace
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from PIL import Image
-from pipecat.processors.aggregators.llm_context import LLMContext
 
 from callbuddy import screen
 
@@ -16,10 +16,6 @@ def png_bytes(w=2880, h=1800) -> bytes:
     out = io.BytesIO()
     Image.new("RGB", (w, h), "white").save(out, format="PNG")
     return out.getvalue()
-
-
-def image_parts(messages):
-    return [p for m in messages if isinstance(m.get("content"), list) for p in m["content"] if p.get("type") == "image_url"]
 
 
 def test_normalize_downscales_big_screens():
@@ -48,25 +44,6 @@ def test_store_ignores_stale_screenshots():
     assert store.fresh(now=100.0) is None
 
 
-def test_strip_old_screenshots_keeps_text():
-    msgs = [
-        {"role": "user", "content": [{"type": "text", "text": "hi"}, {"type": "image_url", "image_url": {"url": "x"}}]},
-        {"role": "assistant", "content": "hello"},
-    ]
-    out = screen.strip_old_screenshots(msgs)
-    assert image_parts(out) == []
-    assert {"type": "text", "text": "hi"} in out[0]["content"]
-    assert out[1] == msgs[1]
-
-
-def test_only_one_screenshot_in_context_after_many_turns():
-    store, ctx = screen.ScreenStore(), LLMContext()
-    for turn in range(3):
-        ctx.add_message({"role": "user", "content": f"question {turn}"})
-        asyncio.run(screen.attach_screenshot(ctx, store.put(png_bytes())))
-    assert len(image_parts(ctx.get_messages())) == 1
-
-
 def test_routes_upload_stop_and_page():
     store, app = screen.ScreenStore(), FastAPI()
     screen.add_screen_routes(app, store=store, page_html="<h1>Call Buddy</h1>")
@@ -80,11 +57,34 @@ def test_routes_upload_stop_and_page():
     assert store.fresh() is None
 
 
-def test_short_replies_get_no_screenshot():
-    assert not screen.wants_screenshot([{"role": "user", "content": "Thank you."}])
-    assert not screen.wants_screenshot([{"role": "user", "content": "yes"}])
-    assert screen.wants_screenshot([{"role": "user", "content": "what is this error here?"}])
-    # Looks at the LAST user message only.
-    msgs = [{"role": "user", "content": "summarize this page for me"}, {"role": "assistant", "content": "ok"},
-            {"role": "user", "content": "thanks"}]
-    assert not screen.wants_screenshot(msgs)
+class FakeVision:
+    def __init__(self, reply="The error says: No module named pandas."):
+        self.reply, self.requests = reply, []
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
+
+    async def _create(self, **kwargs):
+        self.requests.append(kwargs)
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=self.reply))])
+
+
+def test_look_at_screen_without_sharing_tells_user_how():
+    out = asyncio.run(screen.look_at_screen(FakeVision(), "m", "what's this?", screen.ScreenStore()))
+    assert "Share screen" in out["error"]
+
+
+def test_look_at_screen_sends_newest_screenshot_and_question():
+    store, vision = screen.ScreenStore(), FakeVision()
+    store.put(png_bytes())
+    out = asyncio.run(screen.look_at_screen(vision, "qwen", "what is this error?", store))
+    assert out == {"seen_on_screen": "The error says: No module named pandas."}
+    req = vision.requests[0]
+    parts = req["messages"][-1]["content"]
+    assert req["model"] == "qwen" and parts[0]["text"] == "what is this error?"
+    assert parts[1]["image_url"]["url"].startswith("data:image/jpeg;base64,")
+
+
+def test_look_at_screen_with_empty_question_still_works():
+    store, vision = screen.ScreenStore(), FakeVision()
+    store.put(png_bytes())
+    asyncio.run(screen.look_at_screen(vision, "m", "", store))
+    assert "Describe" in vision.requests[0]["messages"][-1]["content"][0]["text"]

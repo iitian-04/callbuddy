@@ -252,20 +252,6 @@ async def run_tool(gmail: Gmail, name: str, args: dict) -> dict:
         return {"error": str(e)[:300]}
 
 
-def register_gmail_tools(llm, gmail: Gmail):
-    """Register the tools on a Pipecat LLM service and return a ToolsSchema for the context."""
-    from pipecat.adapters.llm.schemas.function_schema import FunctionSchema
-    from pipecat.adapters.llm.schemas.tools_schema import ToolsSchema
-
-    for spec in TOOL_SPECS:
-
-        async def handler(params, _name=spec["name"]):
-            await params.result_callback(await run_tool(gmail, _name, dict(params.arguments)))
-
-        llm.register_function(spec["name"], handler)
-    return ToolsSchema(standard_tools=[FunctionSchema(**spec) for spec in TOOL_SPECS])
-
-
 if __name__ == "__main__":
     if sys.argv[1:] == ["auth"]:
         authorize()

@@ -70,3 +70,7 @@ violations) with ~Y s average response latency, at near-zero cost.
   email summarized correctly). Failures: 1 invented email, 3 silent turns (Groq tool validation),
   LLM avg 3.6 s / max 20 s (8,000 tokens/min per model, 1,000 requests/day). Fixed (failures.md #9).
   Live re-test: 10/10 searched instead of guessing at temperature 0.3.
+- 2026-11-12: Gmail test 2: still slow (LLM avg 4.3 s, max 15.6 s), one search result never spoken. qwen
+  sent malformed tool args; ~1.5-2.2k tokens per request vs 8,000 tokens/min. Redesign: gpt-oss-120b
+  brain + look_at_screen tool. Live: 10/10 email questions searched first, 6/6 screen questions
+  used look_at_screen, draft request asked first; look_at_screen read a fake pandas error. 46 unit tests.

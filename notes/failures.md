@@ -74,6 +74,17 @@ Real failures seen while testing, with the fix. Newest last.
   temperature 0.3 (live: 10/10 searched, was 4/5 with one junk reply); snippets 120 chars,
   context 10 messages, previous-session summary capped at 400 chars.
 
+## 10. Gmail still slow and answers lost (S3, 2026-11-12, second test)
+- Seen: after "latest email about payment" the search ran (5 results) but no answer was ever spoken;
+  LLM avg 4.3 s, max 15.6 s.
+- Log: the vision model (qwen) sent broken tool calls (`{}`, `{'param-value': ...}`), so one question
+  cost 3-4 requests of ~1,500-2,200 tokens each: over the 8,000 tokens/min free limit. A "." noise
+  transcription and "Hello" counted as new turns and cancelled the pending answer.
+- Fix (new design, "vision as a tool"): main brain is gpt-oss-120b (clean tool calls in tests:
+  10/10 searched, 6/6 used look_at_screen for screen questions). The screen is only sent to the
+  vision model when needed, via look_at_screen(question). Tools keep running if you interrupt
+  (cancel_on_interruption=False). NoiseFilter drops transcriptions with no words.
+
 ## Open: Kokoro "TTS context completed with no audio" errors (0 in the last session)
 - Seen in every session (4-5 times per call; also right after the TTSSpeakFrame opening line). Non-fatal: speech continues. Cause not yet
   found; to investigate.

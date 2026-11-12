@@ -9,9 +9,11 @@ How a voice turn flows through the pipeline (each box is a Pipecat "processor";
 "frames" of audio/text flow from left to right):
 
   /buddy page --- one small JPEG every 2 s, POST /screen ---> ScreenStore (newest only)
-  mic audio -> [transport.input] -> [STT] -> [user aggregator + Silero VAD]
-            -> [ScreenInjector: adds newest screenshot]
-            -> [LLM: Groq] -> [TTS: Kokoro] -> [transport.output] -> your speakers
+  mic audio -> [transport.input] -> [STT] -> [NoiseFilter] -> [user aggregator + Silero VAD]
+            -> [Memory: notes on top] -> [LLM: Groq gpt-oss + tools] -> [TTS: Kokoro]
+            -> [transport.output] -> your speakers
+  Tools the LLM can call: look_at_screen (asks a vision model about the newest screenshot),
+  and search_emails / read_email / create_draft when Gmail is connected.
             -> [assistant aggregator] (remembers what the bot actually said)
 """
 
@@ -59,7 +61,7 @@ from pipecat.transports.base_transport import BaseTransport, TransportParams  # 
 
 from callbuddy.brief import CallBrief  # noqa: E402
 from callbuddy.planner import plan_call  # noqa: E402
-from callbuddy.gmail import Gmail, register_gmail_tools  # noqa: E402
+from callbuddy.gmail import Gmail  # noqa: E402
 from callbuddy.prompts import (  # noqa: E402
     GREETING,
     build_call_prompt,
@@ -67,7 +69,9 @@ from callbuddy.prompts import (  # noqa: E402
     split_sentences,
 )
 from callbuddy.memory import MemoryProcessor, SessionMemory  # noqa: E402
-from callbuddy.screen import ScreenInjector, add_screen_routes  # noqa: E402
+from callbuddy.noise import NoiseFilter  # noqa: E402
+from callbuddy.screen import SCREEN_STORE, add_screen_routes  # noqa: E402
+from callbuddy.tools import register_tools  # noqa: E402
 
 KOKORO_DIR = Path.home() / ".cache" / "pipecat" / "kokoro-onnx"
 
@@ -90,8 +94,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 
     # 2. LLM (the brain): Groq's OpenAI-compatible API. Streams the reply token by token,
     #    so TTS can start speaking before the whole answer is finished.
-    #    Call mode: gpt-oss (text) with rules from the CallBrief.
-    #    Screen mode: a model that can read images, since it gets screenshots.
+    #    Call mode: gpt-oss with rules from the CallBrief.
+    #    Screen mode: gpt-oss too (reliable with tools); it looks at the screen through the
+    #    look_at_screen tool, which asks a vision model (notes/failures.md #10).
     if CALL_BRIEF:
         llm_settings = GroqLLMService.Settings(
             model=settings.groq_model,
@@ -103,10 +108,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         gmail = Gmail.from_saved_token()
         logger.info("Gmail: connected" if gmail else "Gmail: not connected")
         llm_settings = GroqLLMService.Settings(
-            model=settings.vision_model,
+            model=settings.groq_model,
             system_instruction=build_screen_prompt(date.today().strftime("%A %d %B %Y"), gmail is not None),
-            reasoning_effort=settings.vision_reasoning_effort,
-            temperature=settings.vision_temperature,
+            reasoning_effort=settings.groq_reasoning_effort,
         )
     llm = GroqLLMService(api_key=settings.groq_api_key.get_secret_value(), settings=llm_settings)
 
@@ -125,7 +129,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     #    message; Silero VAD (voice activity detection) decides when you started and
     #    stopped talking. When VAD hears you start talking while the bot is speaking,
     #    Pipecat sends an "interruption" and the bot stops (barge-in).
-    tools = register_gmail_tools(llm, gmail) if (not CALL_BRIEF and gmail) else None
+    tools = None
+    if not CALL_BRIEF:
+        from openai import AsyncOpenAI
+
+        groq = AsyncOpenAI(api_key=settings.groq_api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1")
+        tools = register_tools(llm, vision_client=groq, vision_model=settings.vision_model,
+                               store=SCREEN_STORE, gmail=gmail)
     context = LLMContext(tools=tools) if tools else LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
@@ -141,12 +151,7 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     # 5. Memory (screen mode): short notes about what you're working on, a summary on exit.
     memory = None
     if not CALL_BRIEF:
-        from openai import AsyncOpenAI
-
-        notes_client = AsyncOpenAI(
-            api_key=settings.groq_api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1"
-        )
-        memory = SessionMemory(notes_client, settings.memory_model)
+        memory = SessionMemory(groq, settings.memory_model)
         if memory.last_session:
             logger.info("Memory: loaded the summary of your previous session")
     memory_processors = [MemoryProcessor(memory)] if memory else []
@@ -155,9 +160,9 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         [
             transport.input(),  # audio from the browser mic
             stt,  # audio -> text
+            NoiseFilter(),  # drop "." and other no-word transcriptions
             user_aggregator,  # text -> "user said X" in the context
             *memory_processors,  # notes at the top, old turns trimmed (screen mode only)
-            ScreenInjector(),  # adds "this is my screen right now" + newest screenshot
             llm,  # context -> reply text (streamed)
             tts,  # reply text -> audio
             transport.output(),  # audio -> browser speakers
@@ -232,7 +237,7 @@ if __name__ == "__main__":
         )
         logger.info("Call brief:\n" + CALL_BRIEF.model_dump_json(indent=2))
     else:
-        logger.info(f"No --task given: screen-buddy mode (vision model {settings.vision_model})")
+        logger.info(f"No --task given: screen-buddy mode ({settings.groq_model} + {settings.vision_model} for the screen)")
 
     # Add the Call Buddy page (/buddy) and the screenshot endpoint to the runner's web server.
     from pipecat.runner.run import app

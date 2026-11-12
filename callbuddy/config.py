@@ -32,11 +32,8 @@ class Settings(BaseSettings):
     groq_model: str = "openai/gpt-oss-120b"
     # gpt-oss "thinks" before answering; "low" keeps that short so voice replies are fast.
     groq_reasoning_effort: str = "low"
-    # S1 screen mode: a Groq model that can read images (gpt-oss is text-only).
+    # Screen mode: the look_at_screen tool sends the screenshot to this model (reads images).
     vision_model: str = "qwen/qwen3.8-27b"
-    vision_reasoning_effort: str = "none"  # no "thinking" = fastest replies for voice
-    # Lower = steadier tool calls (at the default it sometimes skipped a search or sent junk text).
-    vision_temperature: float = 0.3
     # S2 memory: small fast text model that rewrites the session notes every few turns.
     memory_model: str = "openai/gpt-oss-20b"
     kokoro_voice: str = "af_heart"
