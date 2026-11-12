@@ -84,6 +84,19 @@ async function stop() {
 }
 
 btn.addEventListener("click", () => (stream ? stop() : start()));
+
+// The voice panel below has its own screen-share and camera buttons. They send WebRTC
+// video, which froze the bot (notes/failures.md #6), and the bot ignores it anyway. Hide them
+// so the only way to share is the "Share screen" button above. Same origin, so we can style it.
+const frame = document.querySelector("iframe");
+frame.addEventListener("load", () => {
+  const style = frame.contentDocument.createElement("style");
+  style.textContent = `
+    button[aria-label*="screen shar" i],
+    button:has(svg.lucide-video), button:has(svg.lucide-video-off),
+    button:has(svg.lucide-monitor), button:has(svg.lucide-monitor-off) { display: none !important; }`;
+  frame.contentDocument.head.appendChild(style);
+});
 </script>
 </body>
 </html>
