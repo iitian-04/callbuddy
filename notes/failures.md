@@ -46,6 +46,13 @@ Real failures seen while testing, with the fix. Newest last.
   to a 1280 px JPEG every 2 s and POSTs it to /screen; the bot only keeps the newest one.
   Voice stays audio-only, so nothing renegotiates. Tests for the store and the routes added.
 
+## 7. "Not able to see my screen": wrong share button (S1, 2026-11-12)
+- Seen: user shared with the voice panel's own monitor icon; 0 screenshots reached the bot
+  (log: trackStatus receiver 2 enabled, no POST /screen). Bot kept saying it can't see the screen.
+- Cause: two share buttons on /buddy; the panel's one sends WebRTC video, which the bot now ignores.
+- Fix: /buddy hides the panel's screen-share and camera buttons, so only the working button is
+  left; the bot now tells you to click the blue "Share screen" button at the top.
+
 ## Open: Kokoro "TTS context completed with no audio" errors
 - Seen in every session (4-5 times per call; also right after the TTSSpeakFrame opening line). Non-fatal: speech continues. Cause not yet
   found; to investigate.
