@@ -14,7 +14,7 @@ It can also run a planned phone-call conversation: `uv run python bot.py --task 
 git clone <this repo> && cd callbuddy
 uv sync                      # installs Python 3.12 deps from uv.lock
 cp .env.example .env         # then add your own GROQ_API_KEY (Deepgram key optional)
-uv run python bot.py         # open http://localhost:7860/client, click Connect, share your screen
+uv run python bot.py         # open http://localhost:7860/buddy, click Connect, then Share screen
 uv run pytest                # unit tests (no API calls)
 ```
 

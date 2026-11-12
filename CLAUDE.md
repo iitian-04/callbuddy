@@ -37,7 +37,7 @@ Phone-call mode (planner LLM writes a "call brief", Pipecat runs the call) is ke
 - Ask before running any command that installs system software, deletes files, or spends credit.
 
 ## Commands
-- Run bot (browser, screen buddy): uv run python bot.py
+- Run bot (browser, screen buddy): uv run python bot.py   then open http://localhost:7860/buddy
 - Run with a task:   uv run python bot.py --task "..."
 - Tests:             uv run pytest
 - Eval:              uv run python eval/run_eval.py

@@ -1,0 +1,89 @@
+<!doctype html>
+<!--
+  Call Buddy page: the Pipecat voice client (in the frame below) + a screen-share bar.
+  Screen sharing happens HERE, not in the voice client: every 2 s we draw the shared screen
+  onto a canvas, shrink it to max 1280 px, and POST one JPEG to /screen. The bot never has
+  to decode a video stream, so the voice keeps working while you share.
+  Nothing is uploaded until you click "Share screen", and it stops when you click Stop.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Call Buddy</title>
+<style>
+  :root { --bg:#0f1115; --panel:#181b22; --text:#e8eaf0; --muted:#9aa0ad; --accent:#4f8cff; --warn:#f2b84b; --bad:#ff6b6b; --ok:#3ecf8e; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--text); font:14px/1.4 system-ui, -apple-system, sans-serif; }
+  body { display:flex; flex-direction:column; }
+  header { display:flex; align-items:center; gap:12px; padding:10px 16px; background:var(--panel); border-bottom:1px solid #262a33; flex-wrap:wrap; }
+  h1 { font-size:16px; margin:0 8px 0 0; }
+  button { border:0; border-radius:8px; padding:8px 14px; font:inherit; font-weight:600; cursor:pointer; color:#fff; background:var(--accent); }
+  button.stop { background:var(--bad); }
+  #status { color:var(--muted); }
+  #status.on { color:var(--ok); }
+  #preview { height:44px; border-radius:6px; border:1px solid #262a33; display:none; }
+  .note { flex-basis:100%; color:var(--warn); font-size:12px; }
+  iframe { flex:1; width:100%; border:0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Call Buddy</h1>
+  <button id="share">Share screen</button>
+  <img id="preview" alt="What Call Buddy sees">
+  <span id="status">Not sharing. Click Connect below to talk, then share your screen.</span>
+  <div class="note">Privacy: while sharing, a screenshot is sent to Groq each time you talk. Share one window, and keep passwords and private chats off screen.</div>
+</header>
+<iframe src="/client/" allow="microphone; autoplay"></iframe>
+<script>
+const EVERY_MS = 2000, MAX_SIDE = 1280;
+const btn = document.getElementById("share"), statusEl = document.getElementById("status"), preview = document.getElementById("preview");
+let stream = null, timer = null, busy = false, sent = 0;
+const video = document.createElement("video"); video.muted = true; video.playsInline = true;
+const canvas = document.createElement("canvas");
+
+function setStatus(text, on) { statusEl.textContent = text; statusEl.className = on ? "on" : ""; }
+
+async function sendFrame() {
+  if (busy || !video.videoWidth) return;
+  busy = true;
+  try {
+    const scale = Math.min(1, MAX_SIDE / Math.max(video.videoWidth, video.videoHeight));
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(r => canvas.toBlob(r, "image/jpeg", 0.75));
+    const res = await fetch("/screen", { method: "POST", headers: { "Content-Type": "image/jpeg" }, body: blob });
+    if (!res.ok) throw new Error((await res.json()).error || res.status);
+    sent++;
+    preview.src = URL.createObjectURL(blob); preview.style.display = "block";
+    setStatus(`Sharing: Call Buddy sees this (${canvas.width}x${canvas.height}, ${sent} sent)`, true);
+  } catch (e) {
+    setStatus("Couldn't send screenshot: " + e.message, false);
+  } finally { busy = false; }
+}
+
+async function start() {
+  try {
+    stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { max: 5 } }, audio: false });
+  } catch (e) { setStatus("Screen share cancelled or blocked.", false); return; }
+  video.srcObject = stream; await video.play();
+  stream.getVideoTracks()[0].addEventListener("ended", stop);  // browser's own "Stop sharing"
+  btn.textContent = "Stop sharing"; btn.className = "stop";
+  sendFrame(); timer = setInterval(sendFrame, EVERY_MS);
+}
+
+async function stop() {
+  clearInterval(timer); timer = null;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null; sent = 0; preview.style.display = "none";
+  btn.textContent = "Share screen"; btn.className = "";
+  setStatus("Not sharing.", false);
+  try { await fetch("/screen", { method: "DELETE" }); } catch (e) {}
+}
+
+btn.addEventListener("click", () => (stream ? stop() : start()));
+</script>
+</body>
+</html>

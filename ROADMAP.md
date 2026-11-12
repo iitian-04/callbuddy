@@ -39,8 +39,9 @@ The phone-call work (Phases 0–2) stays and returns in S5. Old phone-call Phase
 ## S1: See and explain (12 Nov)
 Goal: share your screen, talk, and Call Buddy answers about what's on it. No actions.
 - [x] Rename to "Call Buddy" (spoken name, prompts, README)
-- [x] Screen sharing in the browser client (SmallWebRTC `screenVideo`, 1 frame/s)
-- [x] `callbuddy/screen.py`: keep newest frame in memory only, attach it (JPEG, max 1280 px)
+- [x] Screen sharing via the /buddy page: browser sends one 1280 px JPEG every 2 s over HTTP
+      (WebRTC screen video froze the bot, see notes/failures.md #6)
+- [x] `callbuddy/screen.py`: keep newest screenshot in memory only, attach it (JPEG, max 1280 px)
       before each LLM call, older screenshots replaced by a note
 - [x] Vision LLM on Groq free tier (`qwen/qwen3.8-27b`, `VISION_MODEL` in .env)
 - [x] Greeting with AI + privacy disclaimer (screenshots go to Groq), spoken word for word

@@ -3,18 +3,20 @@
 Run:   uv run python bot.py                      (screen buddy, the default)
        uv run python bot.py --task "Book a table for 4 at 8 pm Saturday, 7:30-9 ok"
                                                   (call mode: you play the restaurant)
-Open:  http://localhost:7860/client  click Connect (use headphones!), then share your screen.
+Open:  http://localhost:7860/buddy   click Connect (use headphones!), then "Share screen".
 
 How a voice turn flows through the pipeline (each box is a Pipecat "processor";
 "frames" of audio/text flow from left to right):
 
-  mic + screen -> [transport.input] -> [ScreenBuffer: keeps newest screen frame]
-            -> [STT] -> [user aggregator + Silero VAD] -> [ScreenInjector: adds screenshot]
+  /buddy page --- one small JPEG every 2 s, POST /screen ---> ScreenStore (newest only)
+  mic audio -> [transport.input] -> [STT] -> [user aggregator + Silero VAD]
+            -> [ScreenInjector: adds newest screenshot]
             -> [LLM: Groq] -> [TTS: Kokoro] -> [transport.output] -> your speakers
             -> [assistant aggregator] (remembers what the bot actually said)
 """
 
 import argparse
+from pathlib import Path
 
 from loguru import logger
 
@@ -47,16 +49,12 @@ from pipecat.runner.types import RunnerArguments  # noqa: E402
 from pipecat.runner.utils import create_transport  # noqa: E402
 from pipecat.services.groq.llm import GroqLLMService  # noqa: E402
 from pipecat.services.kokoro.tts import KokoroTTSService  # noqa: E402
-from pipecat.transports.base_transport import (  # noqa: E402
-    BaseTransport,
-    TransportParams,
-    VideoInSourceParams,
-)
+from pipecat.transports.base_transport import BaseTransport, TransportParams  # noqa: E402
 
 from callbuddy.brief import CallBrief  # noqa: E402
 from callbuddy.planner import plan_call  # noqa: E402
 from callbuddy.prompts import GREETING, SYSTEM_PROMPT, build_call_prompt  # noqa: E402
-from callbuddy.screen import SCREEN_SOURCE, ScreenBuffer, ScreenInjector  # noqa: E402
+from callbuddy.screen import ScreenInjector, add_screen_routes  # noqa: E402
 
 # Set once at startup when --task is given. None means screen-buddy mode (the default).
 CALL_BRIEF: CallBrief | None = None
@@ -106,16 +104,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
         user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
     )
 
-    # 5. Screen: remember the newest shared-screen frame, attach it before each LLM call.
-    screen_buffer = ScreenBuffer()
-
     pipeline = Pipeline(
         [
-            transport.input(),  # audio from the browser mic (+ screen frames)
-            screen_buffer,  # keeps the newest screen frame, drops video from the pipeline
+            transport.input(),  # audio from the browser mic
             stt,  # audio -> text
             user_aggregator,  # text -> "user said X" in the context
-            ScreenInjector(screen_buffer),  # adds "this is my screen right now" + screenshot
+            ScreenInjector(),  # adds "this is my screen right now" + newest screenshot
             llm,  # context -> reply text (streamed)
             tts,  # reply text -> audio
             transport.output(),  # audio -> browser speakers
@@ -154,14 +148,8 @@ async def bot(runner_args: RunnerArguments):
     """Entry point the Pipecat runner calls when a browser connects."""
     transport_params = {
         # SmallWebRTC: a direct browser <-> laptop WebRTC connection, no account needed.
-        # In screen mode we also take the shared screen, 1 frame per second (plenty for
-        # reading a screen, and cheap). Call mode is audio only.
-        "webrtc": lambda: TransportParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            video_in_enabled=CALL_BRIEF is None,
-            video_in_sources={SCREEN_SOURCE: VideoInSourceParams(framerate=1)} if CALL_BRIEF is None else {},
-        ),
+        # Audio only: screenshots come over HTTP from the /buddy page, not as WebRTC video.
+        "webrtc": lambda: TransportParams(audio_in_enabled=True, audio_out_enabled=True),
     }
     transport = await create_transport(runner_args, transport_params)
     await run_bot(transport, runner_args)
@@ -189,5 +177,12 @@ if __name__ == "__main__":
         logger.info("Call brief:\n" + CALL_BRIEF.model_dump_json(indent=2))
     else:
         logger.info(f"No --task given: screen-buddy mode (vision model {settings.vision_model})")
+
+    # Add the Call Buddy page (/buddy) and the screenshot endpoint to the runner's web server.
+    from pipecat.runner.run import app
+
+    page = (Path(__file__).parent / "callbuddy" / "static" / "buddy.html").read_text()
+    add_screen_routes(app, page_html=page)
+    logger.info("Open http://localhost:7860/buddy to talk and share your screen")
 
     main(parser)

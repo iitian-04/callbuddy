@@ -1,10 +1,10 @@
 """Live check: the vision model reads a screenshot we attach the same way the bot does."""
 
 import asyncio
+import io
 
 import pytest
 from PIL import Image, ImageDraw, ImageFont
-from pipecat.frames.frames import InputImageRawFrame
 from pipecat.processors.aggregators.llm_context import LLMContext
 
 from callbuddy import screen
@@ -21,11 +21,13 @@ def test_vision_model_reads_fake_screen():
     img = Image.new("RGB", (1440, 900), "white")
     font = ImageFont.load_default(size=36)
     ImageDraw.Draw(img).text((60, 400), "ModuleNotFoundError: No module named 'pandas'", fill="red", font=font)
-    frame = InputImageRawFrame(image=img.tobytes(), size=img.size, format="RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    shot = screen.ScreenStore().put(buf.getvalue())  # same path as an upload from /buddy
 
     ctx = LLMContext()
     ctx.add_message({"role": "user", "content": "What's this error on my screen?"})
-    asyncio.run(screen.attach_screenshot(ctx, frame))
+    asyncio.run(screen.attach_screenshot(ctx, shot))
 
     s = load_settings()
     client = OpenAI(api_key=s.groq_api_key.get_secret_value(), base_url="https://api.groq.com/openai/v1")

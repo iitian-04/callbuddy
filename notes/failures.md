@@ -35,6 +35,17 @@ Real failures seen while testing, with the fix. Newest last.
 - Fix: prompt explains these STT formats and says to accept times inside the acceptable
   outcomes, or ask to repeat if unclear. Live scenarios "stt 8.15" and "stt 850" added; both pass.
 
+## 6. Bot went silent as soon as screen sharing started (S1, 2026-11-12)
+- Seen: the moment the screen share started you could no longer hear the bot.
+- Log: one Kokoro sentence took 31.9 s (normally ~2 s), then "SmallWebRTCOutputTransport timed
+  out after 10.0s writing audio ... the peer has stopped reading", output marked unusable.
+  Adding the screen track also renegotiated the WebRTC connection mid-call.
+- Cause: the bot received the screen as WebRTC video and had to decode a full-resolution stream
+  at up to 30 fps in Python. That starved the event loop for ~30 s, so audio output timed out.
+- Fix: no WebRTC video at all. New page /buddy: the browser grabs the screen, shrinks one frame
+  to a 1280 px JPEG every 2 s and POSTs it to /screen; the bot only keeps the newest one.
+  Voice stays audio-only, so nothing renegotiates. Tests for the store and the routes added.
+
 ## Open: Kokoro "TTS context completed with no audio" errors
 - Seen in every session (4-5 times per call; also right after the TTSSpeakFrame opening line). Non-fatal: speech continues. Cause not yet
   found; to investigate.
