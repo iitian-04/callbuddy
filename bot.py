@@ -33,7 +33,7 @@ setup_logging(
 logger.info("Loading Pipecat (first run downloads the Silero and Kokoro models)...")
 
 from pipecat.audio.vad.silero import SileroVADAnalyzer  # noqa: E402
-from pipecat.frames.frames import LLMRunFrame  # noqa: E402
+from pipecat.frames.frames import LLMRunFrame, TTSSpeakFrame  # noqa: E402
 from pipecat.pipeline.pipeline import Pipeline  # noqa: E402
 from pipecat.pipeline.runner import PipelineRunner  # noqa: E402
 from pipecat.pipeline.task import PipelineParams, PipelineTask  # noqa: E402
@@ -54,7 +54,6 @@ from callbuddy.prompts import (  # noqa: E402
     GREETING_INSTRUCTION,
     SYSTEM_PROMPT,
     build_call_prompt,
-    call_opening_instruction,
 )
 
 # Set once at startup when --task is given. None means free-chat mode (Phase 1).
@@ -119,10 +118,16 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Client connected")
-        # The bot speaks first: the planned opening line in call mode, a hello otherwise.
-        first = call_opening_instruction(CALL_BRIEF) if CALL_BRIEF else GREETING_INSTRUCTION
-        context.add_message({"role": "developer", "content": first})
-        await task.queue_frames([LLMRunFrame()])
+        if CALL_BRIEF:
+            # Call mode: speak the planned opening line directly (no LLM call). TTSSpeakFrame
+            # also adds it to the context as the bot's turn. Earlier we asked the LLM to
+            # "say exactly this", but that instruction stayed in the context and the bot
+            # repeated the opening line every time it was interrupted (notes/failures.md #1).
+            await task.queue_frames([TTSSpeakFrame(CALL_BRIEF.opening_line)])
+        else:
+            # Free chat: ask the LLM to greet first, so you know it's working.
+            context.add_message({"role": "developer", "content": GREETING_INSTRUCTION})
+            await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):

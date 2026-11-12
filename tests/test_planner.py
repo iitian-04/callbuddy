@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from callbuddy.brief import CallBrief
 from callbuddy.planner import plan_call
-from callbuddy.prompts import build_call_prompt, call_opening_instruction
+from callbuddy.prompts import build_call_prompt
 
 
 class FakeClient:
@@ -96,7 +96,7 @@ def test_call_prompt_contains_the_rules():
     prompt = build_call_prompt(brief)
     for text in ["Priyanshu", "Book a table", "party of 4", "7:30 pm to 9:00 pm", "no time in the window"]:
         assert text in prompt
-    assert brief.opening_line in call_opening_instruction(brief)
+    assert "never digits" in prompt
 
 
 @pytest.mark.live
@@ -112,4 +112,5 @@ def test_live_planner_book_table():
     print(brief.model_dump_json(indent=2))
     assert "AI" in brief.opening_line
     options = " ".join(brief.acceptable_options).lower()
-    assert "7:30" in options and "9" in options
+    # Times may be digits or words ("seven thirty pm"), since the prompt asks for spoken style.
+    assert ("7:30" in options or "seven thirty" in options) and ("9" in options or "nine" in options)

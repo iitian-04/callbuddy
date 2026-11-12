@@ -23,12 +23,16 @@ Turn the user's task into a call brief. Reply with ONE JSON object matching this
 Rules:
 - Use only facts from the task. Never invent phone numbers, prices, or personal details.
 - If the caller's name is not in the task, use "{default_name}".
+- details_to_share: what the other person needs to know (names, party size, date, the
+  preferred option). Do NOT list the acceptable range there: the agent asks for the
+  preferred option first and only uses the range to judge offers.
 - acceptable_options: list exactly what may be accepted, including any allowed range
   of times or alternatives the task mentions. Be concrete (write times like "8:15 pm").
 - must_not_do: always include "do not accept anything outside the acceptable options",
   "do not share details that are not listed", and "do not agree to pay anything".
 - opening_line: one short sentence that says it is an AI assistant calling on behalf of
-  the caller, then states the request.
+  the caller, then states the request. It is read aloud by a voice engine, so write
+  numbers and times in words ("a table for four at eight pm"), never digits.
 - Today is {today}.
 """
 
