@@ -47,6 +47,10 @@ from pipecat.processors.aggregators.llm_response_universal import (  # noqa: E40
     LLMUserAggregatorParams,
 )
 from pipecat.runner.types import RunnerArguments  # noqa: E402
+from pipecat.turns.user_start.min_words_user_turn_start_strategy import (  # noqa: E402
+    MinWordsUserTurnStartStrategy,
+)
+from pipecat.turns.user_turn_strategies import UserTurnStrategies  # noqa: E402
 from pipecat.runner.utils import create_transport  # noqa: E402
 from pipecat.services.groq.llm import GroqLLMService  # noqa: E402
 from pipecat.services.kokoro.tts import KokoroTTSService  # noqa: E402
@@ -113,7 +117,13 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     context = LLMContext()
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
-        user_params=LLMUserAggregatorParams(vad_analyzer=SileroVADAnalyzer()),
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(),
+            # While the bot is talking, you need at least 3 words to interrupt it, so short
+            # "yes" / "so," / "thank you" don't cut it off (notes/failures.md #8). When the bot
+            # is quiet, one word still starts your turn.
+            user_turn_strategies=UserTurnStrategies(start=[MinWordsUserTurnStartStrategy(min_words=3)]),
+        ),
     )
 
     # 5. Memory (screen mode): short notes about what you're working on, a summary on exit.

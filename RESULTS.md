@@ -57,3 +57,9 @@ violations) with ~Y s average response latency, at near-zero cost.
   1.6 s for 7 s of audio (2.1x faster than full, fp16 2.6 s, CoreML no gain). Now the default.
 - 2026-11-12: S2 memory: notes every 3 turns with gpt-oss-20b, context trimmed to 16 messages, session
   summary to sessions/ on disconnect. 33 unit tests pass; live notes test: 8 useful notes from a 4-turn chat.
+- 2026-11-12: S1/S2 real test (Gmail): 86 screenshots, it read the inbox and an email, memory notes
+  updated every 3 turns, previous-session summary loaded, new summary saved on disconnect. TTFB avg:
+  STT 0.56 s, Kokoro int8 0.46 s (max 1.6), LLM 3.2 s (max 11.3). 0 Kokoro "no audio" errors.
+  Problems: replies cancelled by short follow-ups; Groq free tier 8,000 tokens/min for qwen with
+  ~800-1,500 tokens per screenshot. Fixed (failures.md #8). Model gave two different token figures
+  (400 billion, then 1.83 billion) for the same email.

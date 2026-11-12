@@ -2,7 +2,7 @@
 <!--
   Call Buddy page: the Pipecat voice client (in the frame below) + a screen-share bar.
   Screen sharing happens HERE, not in the voice client: every 2 s we draw the shared screen
-  onto a canvas, shrink it to max 1280 px, and POST one JPEG to /screen. The bot never has
+  onto a canvas, shrink it to max 1024 px, and POST one JPEG to /screen. The bot never has
   to decode a video stream, so the voice keeps working while you share.
   Nothing is uploaded until you click "Share screen", and it stops when you click Stop.
 -->
@@ -37,7 +37,7 @@
 </header>
 <iframe src="/client/" allow="microphone; autoplay"></iframe>
 <script>
-const EVERY_MS = 2000, MAX_SIDE = 1280;
+const EVERY_MS = 2000, MAX_SIDE = 1024;
 const btn = document.getElementById("share"), statusEl = document.getElementById("status"), preview = document.getElementById("preview");
 let stream = null, timer = null, busy = false, sent = 0;
 const video = document.createElement("video"); video.muted = true; video.playsInline = true;

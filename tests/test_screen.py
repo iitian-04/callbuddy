@@ -24,7 +24,7 @@ def image_parts(messages):
 
 def test_normalize_downscales_big_screens():
     jpeg, size = screen.normalize_jpeg(png_bytes())
-    assert size == (1280, 800)  # max side 1280, aspect ratio kept
+    assert size == (1024, 640)  # max side 1024, aspect ratio kept
     assert jpeg[:2] == b"\xff\xd8"  # JPEG magic bytes
 
 
@@ -73,8 +73,18 @@ def test_routes_upload_stop_and_page():
     client = TestClient(app)
     assert "Call Buddy" in client.get("/buddy").text
     r = client.post("/screen", content=png_bytes(), headers={"Content-Type": "image/png"})
-    assert r.status_code == 200 and r.json()["size"] == [1280, 800]
+    assert r.status_code == 200 and r.json()["size"] == [1024, 640]
     assert store.fresh() is not None
     assert client.post("/screen", content=b"junk").status_code == 400
     client.delete("/screen")
     assert store.fresh() is None
+
+
+def test_short_replies_get_no_screenshot():
+    assert not screen.wants_screenshot([{"role": "user", "content": "Thank you."}])
+    assert not screen.wants_screenshot([{"role": "user", "content": "yes"}])
+    assert screen.wants_screenshot([{"role": "user", "content": "what is this error here?"}])
+    # Looks at the LAST user message only.
+    msgs = [{"role": "user", "content": "summarize this page for me"}, {"role": "assistant", "content": "ok"},
+            {"role": "user", "content": "thanks"}]
+    assert not screen.wants_screenshot(msgs)

@@ -25,11 +25,14 @@ from PIL import Image
 from pipecat.frames.frames import Frame, LLMContextFrame
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
-MAX_SIDE = 1280  # px; big enough to read text, small enough to keep requests fast
+MAX_SIDE = 1024  # px; readable text, fewer image tokens (Groq free tier: 8,000 tokens/min)
 MAX_UPLOAD_BYTES = 3 * 1024 * 1024  # reject anything bigger than 3 MB
 MAX_AGE_S = 10.0  # ignore a screenshot older than this (sharing probably stopped)
 OLD_SCREENSHOT_NOTE = "[older screenshot removed]"
 SCREENSHOT_TEXT = "This is my screen right now."
+# Groq's free tier allows qwen 8,000 tokens per minute and one screenshot costs ~800-1,500
+# tokens, so short replies ("yes", "thank you", "so,") get no screenshot (notes/failures.md #8).
+MIN_WORDS_FOR_SCREENSHOT = 4
 
 
 @dataclass
@@ -107,6 +110,22 @@ async def attach_screenshot(context, shot: Screenshot) -> None:
     logger.debug(f"Attached screenshot {shot.size[0]}x{shot.size[1]}, {len(shot.jpeg) // 1024} KB")
 
 
+def last_user_text(messages: list) -> str:
+    for m in reversed(messages):
+        if isinstance(m, dict) and m.get("role") == "user":
+            c = m.get("content")
+            if isinstance(c, str):
+                return c
+            if isinstance(c, list):
+                return " ".join(p.get("text", "") for p in c if p.get("type") == "text")
+    return ""
+
+
+def wants_screenshot(messages: list) -> bool:
+    """Only attach a screenshot when the user said something substantial."""
+    return len(last_user_text(messages).split()) >= MIN_WORDS_FOR_SCREENSHOT
+
+
 class ScreenInjector(FrameProcessor):
     """Adds the newest screenshot to the context just before each LLM request."""
 
@@ -117,9 +136,13 @@ class ScreenInjector(FrameProcessor):
     async def process_frame(self, frame: Frame, direction: FrameDirection):
         await super().process_frame(frame, direction)
         if isinstance(frame, LLMContextFrame):
+            ctx = frame.context
             shot = self._store.fresh()
-            if shot is not None:
-                await attach_screenshot(frame.context, shot)
+            if shot is not None and wants_screenshot(ctx.get_messages()):
+                await attach_screenshot(ctx, shot)
+            else:
+                # Short reply or no screen: send no image at all this turn (saves tokens).
+                ctx.set_messages(strip_old_screenshots(ctx.get_messages()))
         await self.push_frame(frame, direction)
 
 

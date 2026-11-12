@@ -53,6 +53,15 @@ Real failures seen while testing, with the fix. Newest last.
 - Fix: /buddy hides the panel's screen-share and camera buttons, so only the working button is
   left; the bot now tells you to click the blue "Share screen" button at the top.
 
-## Open: Kokoro "TTS context completed with no audio" errors
+## 8. Questions went unanswered, answers took up to 11 s (S1/S2, 2026-11-12)
+- Seen: "What is your point of view on this?" never got an answer; one reply took 11.3 s.
+- Log: each time the user added a short phrase ("So,", "Thank you", "I think so") the pending
+  reply was cancelled ("broadcasting interruption" 0.1-2 s after the LLM request).
+  Groq headers: qwen free tier = 8,000 tokens/minute; a screenshot is ~800-1,500 tokens and we
+  attached one to every turn, so Groq made us wait (benchmark: 8.6-19 s with an image).
+- Fix: no screenshot for replies of 3 words or fewer; screenshots 1024 px instead of 1280;
+  while the bot speaks you need 3+ words to interrupt (MinWordsUserTurnStartStrategy).
+
+## Open: Kokoro "TTS context completed with no audio" errors (0 in the last session)
 - Seen in every session (4-5 times per call; also right after the TTSSpeakFrame opening line). Non-fatal: speech continues. Cause not yet
   found; to investigate.
