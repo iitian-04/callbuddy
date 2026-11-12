@@ -1,0 +1,24 @@
+[project]
+name = "callbuddy"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "pipecat-ai[deepgram,groq,kokoro,runner,silero,webrtc]==1.15.0",
+    "pydantic-settings>=2.16.2",
+    "python-dotenv>=1.2.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+# Live tests call real APIs (cost credit, need keys). Skipped unless you pass -m live.
+addopts = "-m 'not live'"
+markers = ["live: calls real APIs; run with: uv run pytest -m live"]
+
+[tool.uv]
+package = false

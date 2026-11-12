@@ -1,0 +1,18 @@
+# Runs the tests on every push and pull request. Needs no API keys:
+# live tests are skipped by default (see pyproject.toml).
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install dependencies (exact versions from uv.lock)
+        run: uv sync --locked
+      - name: Run tests
+        run: uv run pytest -v
